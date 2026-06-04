@@ -1,0 +1,153 @@
+<script setup>
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { ref, computed, watch } from 'vue';
+
+const props = defineProps({
+    transaction: { type: Object, default: null },
+    accounts: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => [] },
+});
+
+const form = useForm({
+    type: props.transaction?.type || 'expense',
+    account_id: props.transaction?.account_id || (props.accounts[0]?.id ?? ''),
+    destination_account_id: props.transaction?.destination_account_id || '',
+    category_id: props.transaction?.category_id || '',
+    amount: props.transaction ? Math.abs(props.transaction.amount_cents) / 100 : '',
+    date: props.transaction?.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+    description: props.transaction?.description || '',
+    notes: props.transaction?.notes || '',
+    status: props.transaction?.status || 'paid',
+    is_pix: props.transaction?.is_pix || false,
+    pix_key: props.transaction?.pix_key || '',
+});
+
+const filteredCategories = computed(() => {
+    return props.categories.filter(c => c.type === form.type);
+});
+
+watch(() => form.type, () => {
+    form.category_id = '';
+});
+
+const submit = () => {
+    if (props.transaction) {
+        form.put(route('transactions.update', props.transaction.id));
+    } else {
+        form.post(route('transactions.store'));
+    }
+};
+</script>
+
+<template>
+    <Head :title="props.transaction ? 'Editar transação' : 'Nova transação'" />
+    <AuthenticatedLayout :title="props.transaction ? 'Editar transação' : 'Nova transação'">
+        <form @submit.prevent="submit" class="max-w-2xl space-y-4">
+            <div class="card p-5 md:p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Tipo</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'expense' ? 'border-expense bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700']">
+                            <input v-model="form.type" type="radio" value="expense" class="sr-only">
+                            <span class="text-2xl">⬇️</span>
+                            <p class="text-sm font-medium mt-1">Despesa</p>
+                        </label>
+                        <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'income' ? 'border-income bg-green-50 dark:bg-green-900/20' : 'border-slate-200 dark:border-slate-700']">
+                            <input v-model="form.type" type="radio" value="income" class="sr-only">
+                            <span class="text-2xl">⬆️</span>
+                            <p class="text-sm font-medium mt-1">Receita</p>
+                        </label>
+                        <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'transfer' ? 'border-info bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700']">
+                            <input v-model="form.type" type="radio" value="transfer" class="sr-only">
+                            <span class="text-2xl">↔️</span>
+                            <p class="text-sm font-medium mt-1">Transf.</p>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Descrição</label>
+                    <input v-model="form.description" type="text" placeholder="Ex: Almoço, Salário, Conta de luz" class="input" required>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Valor (R$)</label>
+                        <input v-model="form.amount" type="number" step="0.01" min="0.01" placeholder="0,00" class="input text-lg font-semibold" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Data</label>
+                        <input v-model="form.date" type="date" class="input" required>
+                    </div>
+                </div>
+
+                <div v-if="form.type !== 'transfer'">
+                    <label class="block text-sm font-medium mb-1">Conta</label>
+                    <select v-model="form.account_id" class="input" required>
+                        <option value="">Selecione...</option>
+                        <option v-for="a in props.accounts" :key="a.id" :value="a.id">{{ a.name }}</option>
+                    </select>
+                </div>
+
+                <div v-if="form.type !== 'transfer'">
+                    <label class="block text-sm font-medium mb-1">Categoria</label>
+                    <select v-model="form.category_id" class="input">
+                        <option value="">Sem categoria</option>
+                        <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
+                    </select>
+                </div>
+
+                <div v-if="form.type === 'transfer'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">De (origem)</label>
+                        <select v-model="form.account_id" class="input" required>
+                            <option value="">Selecione...</option>
+                            <option v-for="a in props.accounts" :key="a.id" :value="a.id">{{ a.name }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Para (destino)</label>
+                        <select v-model="form.destination_account_id" class="input" required>
+                            <option value="">Selecione...</option>
+                            <option v-for="a in props.accounts" :key="a.id" :value="a.id" :disabled="a.id == form.account_id">{{ a.name }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Status</label>
+                    <select v-model="form.status" class="input">
+                        <option value="paid">Pago</option>
+                        <option value="pending">Pendente</option>
+                    </select>
+                </div>
+
+                <div class="border-t border-slate-200 dark:border-slate-800 pt-4">
+                    <label class="flex items-center gap-2 mb-2">
+                        <input v-model="form.is_pix" type="checkbox" class="rounded text-brand-500 focus:ring-brand-500">
+                        <span class="text-sm font-medium">É PIX?</span>
+                    </label>
+                    <input v-if="form.is_pix" v-model="form.pix_key" type="text" placeholder="Chave PIX (opcional)" class="input">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Observações</label>
+                    <textarea v-model="form.notes" rows="2" placeholder="Notas opcionais..." class="input"></textarea>
+                </div>
+
+                <div v-if="Object.keys(form.errors).length > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm">
+                    <p v-for="(err, field) in form.errors" :key="field" class="text-expense">{{ err }}</p>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="submit" class="btn-primary" :disabled="form.processing">
+                        <span v-if="form.processing">Salvando...</span>
+                        <span v-else>{{ props.transaction ? 'Atualizar' : 'Criar transação' }}</span>
+                    </button>
+                    <Link :href="route('transactions.index')" class="btn-ghost">Cancelar</Link>
+                </div>
+            </div>
+        </form>
+    </AuthenticatedLayout>
+</template>

@@ -1,58 +1,189 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ☀️ Solar
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> Suas finanças pessoais, com luz própria.
 
-## About Laravel
+**Solar** é um clone modernizado do **Microsoft Money Sunset (2008)**, construído em **Laravel 13 + Vue 3 + Inertia 3** com foco em UX contemporânea estilo fintech brasileira (Nubank/Inter/Will como referência).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## ✨ Status — FASE 1 (Foundation)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Recursos **funcionais** disponíveis:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- 🔐 **Auth completo** — registro, login, logout, middleware
+- 🏠 **Dashboard** com 4 cards KPI (saldo total, receitas/despesas/economia do mês), lista de contas e transações recentes
+- 💳 **CRUD de Contas** (corrente, poupança, cartão, dinheiro, investimento, cripto) com saldo calculado em tempo real
+- 💸 **CRUD de Transações** (receitas, despesas, transferências) com filtros (busca, conta, categoria, tipo), paginação, flag PIX
+- 🏷️ **15 Categorias** pré-populadas (Alimentação, Transporte, Moradia, Saúde, Educação, etc) com ícones emoji e cores
+- 🌗 **Dark mode** com persistência em `localStorage` + tabela `users.theme`
+- ⌨️ **Atalhos de teclado** (`n` = nova transação, `g d` = dashboard, `g t` = transações, etc)
+- 📱 **Mobile-first** com bottom bar de navegação e FAB para nova transação
+- 🧪 **13 testes automatizados** passando (auth, contas, transferências, soft delete)
 
-## Learning Laravel
+Recursos a implementar nas próximas fases (veja `Roadmap` abaixo): gráficos, orçamento, recorrências, Open Finance, IA, etc.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## 🚀 Quick start
 
 ```bash
-composer require laravel/boost --dev
+git clone https://github.com/hdellamanna/solar.git
+cd solar
 
-php artisan boost:install
+# Backend deps
+composer install
+
+# Frontend deps
+npm install
+
+# Banco SQLite + dados demo
+touch database/database.sqlite
+php artisan migrate:fresh --seed
+
+# Subir
+php artisan serve --host 0.0.0.0 --port 8000
+npm run dev   # em outro terminal
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Acesse `http://localhost:8000` e entre com:
 
-## Contributing
+- **Email:** `demo@solar.app`
+- **Senha:** `solar123`
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 🧪 Testes
 
-## Code of Conduct
+```bash
+php artisan test
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```
+Tests:  13 passed (33 assertions)
+Duration: <1s
+```
 
-## Security Vulnerabilities
+## 🏗️ Stack
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Camada       | Tecnologia                              |
+|--------------|------------------------------------------|
+| Backend      | Laravel 13.8 · PHP 8.4 · SQLite (dev)   |
+| Auth         | Sessions + CSRF (built-in, sem Breeze)   |
+| Bridge       | Inertia.js 3.1 (sem API separada)        |
+| Frontend     | Vue 3.5 · Composition API · TypeScript-friendly |
+| Estado       | Pinia 3                                  |
+| UI           | Tailwind 3.4 + tokens custom (solar)    |
+| Bundler      | Vite 8 (rolldown)                        |
+| Charts       | ApexCharts (próxima fase)                |
+| Validação    | FormRequest (backend) + useForm (frontend) |
 
-## License
+## 🗂️ Estrutura
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```
+app/
+  Models/         # User, Account, Category, Transaction, Recurrence
+  Http/
+    Controllers/  # Auth/*, Account*, Transaction*, Dashboard*, Profile*
+    Requests/     # FormRequests por recurso
+    Middleware/   # HandleInertiaRequests (compartilha auth.user)
+database/
+  migrations/     # 8 migrations, soft deletes + índices
+  seeders/        # 1 user demo, 5 contas, 15 categorias, ~140 transações
+resources/js/
+  Pages/
+    Auth/         # Login, Register
+    Accounts/     # Index, Create, Edit
+    Transactions/ # Index, Form (criação e edição)
+    Placeholders/ # Budgets, Reports
+    Profile/      # Edit
+  Layouts/        # AuthenticatedLayout (sidebar/bottombar), GuestLayout
+  Composables/    # useTheme, useShortcuts, useFormat
+  app.js          # createInertiaApp + Pinia + Ziggy
+```
+
+## 💰 Modelo de dados — diagrama ER
+
+```mermaid
+erDiagram
+    USERS ||--o{ ACCOUNTS : owns
+    USERS ||--o{ CATEGORIES : creates
+    USERS ||--o{ TRANSACTIONS : owns
+    ACCOUNTS ||--o{ TRANSACTIONS : "source (account_id)"
+    ACCOUNTS ||--o{ TRANSACTIONS : "destination (destination_account_id)"
+    CATEGORIES ||--o{ TRANSACTIONS : "categorizes"
+    RECURRENCES ||--o{ TRANSACTIONS : "generates"
+
+    USERS {
+        int id PK
+        string name
+        string email
+        string password
+        string theme "light|dark|system"
+    }
+    ACCOUNTS {
+        int id PK
+        int user_id FK
+        string name
+        string type "checking|savings|credit_card|cash|investment|crypto"
+        int initial_balance_cents
+        bool archived
+    }
+    CATEGORIES {
+        int id PK
+        int user_id FK "null=global"
+        string name
+        string type "income|expense"
+        string icon
+        string color
+        bool is_default
+    }
+    TRANSACTIONS {
+        int id PK
+        int user_id FK
+        int account_id FK
+        int destination_account_id FK
+        int category_id FK
+        string type "income|expense|transfer"
+        int amount_cents "signed: +entra, -sai"
+        date date
+        string description
+        bool is_pix
+        string status "paid|pending"
+    }
+```
+
+**Convenção monetária:** todos os valores são armazenados como `int` em centavos. Conversão para reais (divisão por 100) só acontece na camada de apresentação.
+
+**Convenção de sinal:**
+- `income` → `amount_cents > 0` (entra)
+- `expense` → `amount_cents < 0` (sai)
+- `transfer` → `amount_cents < 0` (sai da origem; destino recebe via `destinationTransactions`)
+
+## 📐 UI/UX
+
+- **Mobile-first**: testado em 375px (iPhone SE) até 1920px
+- **Cores semânticas**: verde `income` (#16a34a), vermelho `expense` (#dc2626), amarelo `warn` (#ca8a04), azul `info` (#2563eb)
+- **Moeda formatada** sempre em pt-BR: `R$ 1.234,56` via `Intl.NumberFormat`
+- **Datas** em formato brasileiro: `26/06/2026`
+- **Dark mode** com classe `dark` no `<html>`, persistido em `localStorage` e tabela `users.theme`
+- **Bottom bar mobile** com 5 ícones + FAB central para nova transação
+
+## 🛣️ Roadmap
+
+| Fase | Status | Entrega |
+|------|--------|---------|
+| **FASE 1** | ✅ | Auth + Dashboard + CRUD contas/transações + seeders + testes |
+| FASE 2 | 🔜 | Orçamentos com barra de progresso + recorrências + gráficos reais (ApexCharts) |
+| FASE 3 | 🔜 | Importação CSV/OFX + Relatórios (pizza categoria, linha fluxo, export PDF/CSV) |
+| FASE 4 | 🔜 | Metas de economia + Assinaturas rastreadas + PIX UI + busca global |
+| FASE 5 | 🔜 | Investimentos + Dividas + IA categorize + PWA |
+| FASE 6 | 🔜 | Multi-moeda + Modo casal + Open Finance (mock) + OCR (mock) |
+| FASE 7 | 🔜 | Polish: onboarding, empty states, atalhos, testes E2E, deploy |
+
+## 🤝 Contribuindo
+
+PRs são bem-vindos. Antes de abrir:
+
+```bash
+composer install
+npm install
+php artisan test
+```
+
+## 📄 Licença
+
+MIT — veja [LICENSE](LICENSE).
