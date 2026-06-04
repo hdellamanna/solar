@@ -81,19 +81,26 @@ class Account extends Model
     }
 
     /**
-     * Computed current balance: initial_balance + sum of paid transactions.
+     * Computed current balance: initial_balance + signed sum of paid transactions.
      *
-     * Income is added (positive), expense is subtracted (negative amounts),
-     * and transfers count as outflow from this account and inflow to the destination.
+     * - For ordinary income/expense, only the source `account_id` matters; the
+     *   stored `amount_cents` is already signed (income positive, expense negative).
+     * - For a transfer, `amount_cents` is stored as negative (it represents the
+     *   outflow from the source account). The destination account's balance
+     *   accessor negates the sum of its incoming transfers, so the value flows
+     *   from source to destination.
      */
     public function getBalanceCentsAttribute(): int
     {
         $initial = (int) $this->initial_balance_cents;
-        $sum = (int) $this->transactions()
+        $outflow = (int) $this->transactions()
+            ->where('status', 'paid')
+            ->sum('amount_cents');
+        $inflow = -(int) $this->destinationTransactions()
             ->where('status', 'paid')
             ->sum('amount_cents');
 
-        return $initial + $sum;
+        return $initial + $outflow + $inflow;
     }
 
     /**

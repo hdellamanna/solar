@@ -61,12 +61,21 @@ class DashboardController extends Controller
                 'category' => $t->category?->only(['id', 'name', 'color', 'icon']),
             ]);
 
+        $accountsData = $accounts->map(fn (Account $a) => [
+            'id' => $a->id,
+            'name' => $a->name,
+            'type' => $a->type,
+            'color' => $a->color,
+            'balance_cents' => $a->balance_cents,
+        ]);
+
         return Inertia::render('Dashboard', [
             'totalBalanceCents' => $totalBalanceCents,
             'monthInflowCents' => $monthInflowCents,
             'monthOutflowCents' => $monthOutflowCents,
             'monthSavingsCents' => $monthSavingsCents,
             'recentTransactions' => $recentTransactions,
+            'accounts' => $accountsData,
             'accountCount' => $accounts->count(),
         ]);
     }

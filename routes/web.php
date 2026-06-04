@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -28,10 +29,10 @@ Route::get('/', function () {
 */
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
-    Route::post('/login', [LoginController::class, 'store'])->name('login.attempt');
+    Route::post('/login', [LoginController::class, 'store']);
 
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
-    Route::post('/register', [RegisterController::class, 'store'])->name('register.attempt');
+    Route::post('/register', [RegisterController::class, 'store']);
 });
 
 /*
@@ -51,6 +52,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('transactions', TransactionController::class);
 
     // Placeholders for upcoming features
-    Route::inertia('/budgets', 'Placeholders/Budgets')->name('budgets');
-    Route::inertia('/reports', 'Placeholders/Reports')->name('reports');
+    Route::inertia('/budgets', 'Placeholders/Budgets')->name('budgets.index');
+    Route::inertia('/reports', 'Placeholders/Reports')->name('reports.index');
+
+    // Profile
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
