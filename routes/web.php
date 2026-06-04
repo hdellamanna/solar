@@ -1,10 +1,56 @@
 <?php
 
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', fn () => Inertia::render('Welcome'))->name('home');
+/*
+|--------------------------------------------------------------------------
+| Root redirect
+|--------------------------------------------------------------------------
+*/
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('dashboard');
+    }
+    return redirect()->route('login');
+})->name('home');
 
-// Auth routes will be added in FASE 1
-Route::get('/login', fn () => Inertia::render('Auth/Login'))->name('login');
-Route::get('/register', fn () => Inertia::render('Auth/Register'))->name('register');
+/*
+|--------------------------------------------------------------------------
+| Guest routes
+|--------------------------------------------------------------------------
+*/
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'create'])->name('login');
+    Route::post('/login', [LoginController::class, 'store'])->name('login.attempt');
+
+    Route::get('/register', [RegisterController::class, 'create'])->name('register');
+    Route::post('/register', [RegisterController::class, 'store'])->name('register.attempt');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated routes
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [LogoutController::class, 'destroy'])->name('logout');
+
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Accounts
+    Route::resource('accounts', AccountController::class);
+
+    // Transactions
+    Route::resource('transactions', TransactionController::class);
+
+    // Placeholders for upcoming features
+    Route::inertia('/budgets', 'Placeholders/Budgets')->name('budgets');
+    Route::inertia('/reports', 'Placeholders/Reports')->name('reports');
+});
