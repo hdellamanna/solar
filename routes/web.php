@@ -56,8 +56,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/recurrences/{recurrence}/generate-now', [\App\Http\Controllers\RecurrenceController::class, 'generateNow'])
         ->name('recurrences.generate-now');
 
+    // Budgets (FASE 2B)
+    Route::resource('budgets', \App\Http\Controllers\BudgetController::class);
+    Route::post('/budgets/{budget}/reset', [\App\Http\Controllers\BudgetController::class, 'reset'])
+        ->name('budgets.reset');
+
     // Placeholders for upcoming features
-    Route::inertia('/budgets', 'Placeholders/Budgets')->name('budgets.index');
     Route::inertia('/reports', 'Placeholders/Reports')->name('reports.index');
 
     // Profile
