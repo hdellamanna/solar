@@ -142,7 +142,7 @@ const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
                     <div class="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-2">
                         <p class="text-slate-500">Total</p>
                         <p class="font-semibold text-sm" :class="(tag.total_cents ?? 0) >= 0 ? 'text-income' : 'text-expense'">
-                            R$ {{ totalFor(tag) }}
+                            {{ totalFor(tag) }}
                         </p>
                     </div>
                 </div>
