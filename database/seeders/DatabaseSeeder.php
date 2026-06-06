@@ -5,9 +5,11 @@ namespace Database\Seeders;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Recurrence;
+use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Database\Factories\TagFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -33,6 +35,24 @@ class DatabaseSeeder extends Seeder
         $accounts = $this->seedAccounts($user);
         $this->seedTransactions($user, $accounts);
         $this->seedRecurrences($user);
+        $this->seedTags($user);
+    }
+
+    /**
+     * Seed the 8 demo tags for the demo user.
+     */
+    private function seedTags(User $user): void
+    {
+        foreach (TagFactory::DEMO_TAGS as $slug => $data) {
+            Tag::firstOrCreate(
+                ['user_id' => $user->id, 'slug' => $slug],
+                [
+                    'name'  => $data['name'],
+                    'color' => $data['color'],
+                    'icon'  => $data['icon'],
+                ]
+            );
+        }
     }
 
     private function seedCategories(): void

@@ -77,4 +77,12 @@ class Category extends Model
     {
         return $query->where('type', $type);
     }
+
+    /** Scope used by SearchController: user's own categories + global defaults (user_id null). */
+    public function scopeAccessibleBy(Builder $query, int $userId): Builder
+    {
+        return $query->where(function ($q) use ($userId) {
+            $q->where('user_id', $userId)->orWhereNull('user_id');
+        });
+    }
 }

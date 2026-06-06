@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InvalidTransactionSplitException;
 use App\Http\Requests\Transaction\StoreTransactionRequest;
 use App\Http\Requests\Transaction\UpdateTransactionRequest;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Transaction;
+use App\Models\TransactionSplit;
+use App\Models\User;
+use App\Services\TransactionFilterService;
+use App\Services\TransactionSplitService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,33 +20,19 @@ use Inertia\Response;
 
 class TransactionController extends Controller
 {
+    public function __construct(private readonly TransactionSplitService $splits) {}
+
     /**
      * Display a paginated list of transactions with optional filters.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, TransactionFilterService $filter): Response
     {
         $userId = auth()->id();
-        $query = Transaction::with(['account', 'destinationAccount', 'category'])
-            ->where('user_id', $userId)
-            ->orderByDesc('date')
-            ->orderByDesc('id');
+        $filters = $filter->validate($request);
 
-        if ($request->filled('search')) {
-            $term = '%' . $request->input('search') . '%';
-            $query->where(function ($q) use ($term) {
-                $q->where('description', 'like', $term)
-                  ->orWhere('notes', 'like', $term);
-            });
-        }
-        if ($request->filled('account_id')) {
-            $query->where('account_id', $request->integer('account_id'));
-        }
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->integer('category_id'));
-        }
-        if ($request->filled('type')) {
-            $query->where('type', $request->input('type'));
-        }
+        $query = $filter->baseQuery($userId);
+        $filter->apply($query, $filters);
+        $query->withCount('splits');
 
         return Inertia::render('Transactions/Index', [
             'transactions' => $query->paginate(25)->withQueryString(),
@@ -48,7 +40,8 @@ class TransactionController extends Controller
             'categories' => Category::where(function ($q) use ($userId) {
                 $q->whereNull('user_id')->orWhere('user_id', $userId);
             })->orderBy('name')->get(),
-            'filters' => $request->only(['search', 'account_id', 'category_id', 'type']),
+            'filters' => $filters,
+            'periodPresets' => TransactionFilterService::periodPresets(),
         ]);
     }
 
@@ -69,10 +62,6 @@ class TransactionController extends Controller
     {
         $data = $request->validated();
         $amountCents = (int) round(((float) $data['amount']) * 100);
-        // Expense: stored as negative (outflow from account_id).
-        // Income: stored as positive (inflow to account_id).
-        // Transfer: stored as negative (outflow from source); the destination's
-        //   balance accessor counts it again as +inflow via destinationTransactions.
         $signed = match ($data['type']) {
             'expense', 'transfer' => -$amountCents,
             default => $amountCents,
@@ -93,6 +82,15 @@ class TransactionController extends Controller
             'is_pix' => $request->boolean('is_pix'),
             'pix_key' => $data['pix_key'] ?? null,
         ]);
+
+        if (! empty($data['splits'])) {
+            try {
+                $this->splits->replaceSplits($tx, $data['splits']);
+            } catch (InvalidTransactionSplitException $e) {
+                $tx->delete();
+                return back()->withErrors(['splits' => $e->getMessage()])->withInput();
+            }
+        }
 
         return redirect()->route('transactions.index')->with('success', 'Transação criada.');
     }
@@ -133,6 +131,14 @@ class TransactionController extends Controller
             'pix_key' => $data['pix_key'] ?? null,
         ]);
 
+        if (array_key_exists('splits', $data)) {
+            try {
+                $this->splits->replaceSplits($transaction, $data['splits'] ?? []);
+            } catch (InvalidTransactionSplitException $e) {
+                return back()->withErrors(['splits' => $e->getMessage()])->withInput();
+            }
+        }
+
         return redirect()->route('transactions.index')->with('success', 'Transação atualizada.');
     }
 
@@ -147,17 +153,54 @@ class TransactionController extends Controller
     }
 
     /**
+     * Show transaction details (splits, who paid, status per participant).
+     */
+    public function show(Transaction $transaction): Response
+    {
+        abort_unless($transaction->user_id === auth()->id(), 403);
+        $transaction->load(['account', 'destinationAccount', 'category', 'splits.user', 'splits.category', 'splits.paidBy']);
+
+        return Inertia::render('Transactions/Show', [
+            'transaction' => $transaction,
+            'users' => User::orderBy('name')->get(['id', 'name', 'email']),
+        ]);
+    }
+
+    /**
+     * Toggle a single split's "paid" status (AJAX).
+     */
+    public function toggleSplit(Transaction $transaction, TransactionSplit $split): JsonResponse|RedirectResponse
+    {
+        abort_unless($transaction->user_id === auth()->id(), 403);
+        abort_unless($split->transaction_id === $transaction->id, 404);
+
+        $this->splits->togglePaid($split);
+
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json([
+                'id' => $split->id,
+                'is_paid' => $split->is_paid,
+                'paid_at' => optional($split->paid_at)->toIso8601String(),
+            ]);
+        }
+        return back();
+    }
+
+    /**
      * Shared props for create/edit views.
      */
     private function formProps(?Transaction $transaction = null): Response
     {
         $userId = auth()->id();
+        $transaction?->load('splits.user');
+
         return Inertia::render('Transactions/Form', [
             'transaction' => $transaction,
             'accounts' => Account::where('user_id', $userId)->orderBy('name')->get(),
             'categories' => Category::where(function ($q) use ($userId) {
                 $q->whereNull('user_id')->orWhere('user_id', $userId);
             })->orderBy('name')->get(),
+            'users' => User::orderBy('name')->get(['id', 'name', 'email']),
         ]);
     }
 }

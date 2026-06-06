@@ -25,6 +25,14 @@ class UpdateTransactionRequest extends FormRequest
             'status' => 'required|in:paid,pending',
             'is_pix' => 'boolean',
             'pix_key' => 'nullable|string|max:255',
+
+            // Splits (FASE 3B)
+            'splits' => 'sometimes|array|min:2',
+            'splits.*.user_id' => 'required_with:splits|integer|exists:users,id',
+            'splits.*.category_id' => 'nullable|integer|exists:categories,id',
+            'splits.*.amount_cents' => 'required_with:splits|integer',
+            'splits.*.description' => 'nullable|string|max:255',
+            'splits.*.paid_by_user_id' => 'nullable|integer|exists:users,id',
         ];
     }
 }
