@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -56,7 +58,7 @@ class Transaction extends Model
         'is_pix' => 'boolean',
     ];
 
-    protected $appends = ['amount_decimal', 'signed_amount'];
+    protected $appends = ['amount_decimal', 'signed_amount', 'tag_list'];
 
     /**
      * Owner of the transaction.
@@ -99,6 +101,22 @@ class Transaction extends Model
     }
 
     /**
+     * Tags attached to this transaction.
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'tag_transaction');
+    }
+
+    /**
+     * Shares assigned to other users (splits).
+     */
+    public function splits(): HasMany
+    {
+        return $this->hasMany(TransactionSplit::class);
+    }
+
+    /**
      * Accessor: amount expressed as decimal (e.g. 12345 -> 123.45).
      */
     public function getAmountDecimalAttribute(): float
@@ -112,6 +130,17 @@ class Transaction extends Model
     public function getSignedAmountAttribute(): int
     {
         return (int) $this->amount_cents;
+    }
+
+    /**
+     * Accessor: comma-separated list of tag names for quick display.
+     */
+    public function getTagListAttribute(): string
+    {
+        if (! $this->relationLoaded('tags')) {
+            return '';
+        }
+        return $this->tags->pluck('name')->implode(', ');
     }
 
     /**

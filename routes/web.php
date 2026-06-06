@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -50,6 +51,8 @@ Route::middleware('auth')->group(function () {
 
     // Transactions
     Route::resource('transactions', TransactionController::class);
+    Route::patch('/transactions/{transaction}/splits/{split}/toggle', [TransactionController::class, 'toggleSplit'])
+        ->name('transactions.splits.toggle');
 
     // Recurrences (FASE 2A)
     Route::resource('recurrences', \App\Http\Controllers\RecurrenceController::class);
@@ -63,6 +66,11 @@ Route::middleware('auth')->group(function () {
 
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
+
+    // Tags (FASE 3A)
+    Route::resource('tags', TagController::class);
+    Route::post('/tags/{tag}/attach', [TagController::class, 'attach'])->name('tags.attach');
+    Route::delete('/tags/{tag}/detach/{transaction}', [TagController::class, 'detach'])->name('tags.detach');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

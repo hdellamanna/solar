@@ -1,12 +1,14 @@
 <script setup>
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import SplitEditor from '@/Components/SplitEditor.vue';
 import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
     transaction: { type: Object, default: null },
     accounts: { type: Array, default: () => [] },
     categories: { type: Array, default: () => [] },
+    users: { type: Array, default: () => [] },
 });
 
 const form = useForm({
@@ -21,6 +23,14 @@ const form = useForm({
     status: props.transaction?.status || 'paid',
     is_pix: props.transaction?.is_pix || false,
     pix_key: props.transaction?.pix_key || '',
+    splits: props.transaction?.splits?.length
+        ? props.transaction.splits.map(s => ({
+            user_id: s.user_id,
+            amount_cents: s.amount_cents,
+            description: s.description,
+            category_id: s.category_id,
+        }))
+        : [],
 });
 
 const filteredCategories = computed(() => {
@@ -31,7 +41,32 @@ watch(() => form.type, () => {
     form.category_id = '';
 });
 
+const totalCents = computed(() => {
+    const amt = parseFloat(form.amount || 0);
+    if (!amt || isNaN(amt)) return 0;
+    const cents = Math.round(amt * 100);
+    return (form.type === 'expense' || form.type === 'transfer') ? -cents : cents;
+});
+
+const splitError = ref(null);
+const splitsValid = computed(() => {
+    if (!form.splits || form.splits.length === 0) return true; // not enabled
+    const sum = form.splits.reduce((s, p) => s + Number(p.amount_cents || 0), 0);
+    return sum === Math.abs(totalCents.value);
+});
+
+function onSplitsUpdate(v) {
+    form.splits = v;
+}
+function onSplitsError(e) {
+    splitError.value = e;
+}
+
 const submit = () => {
+    if (!splitsValid.value) {
+        splitError.value = 'A soma das partes nao confere com o total da transacao.';
+        return;
+    }
     if (props.transaction) {
         form.put(route('transactions.update', props.transaction.id));
     } else {
@@ -135,18 +170,35 @@ const submit = () => {
                     <label class="block text-sm font-medium mb-1">Observações</label>
                     <textarea v-model="form.notes" rows="2" placeholder="Notas opcionais..." class="input"></textarea>
                 </div>
+            </div>
 
-                <div v-if="Object.keys(form.errors).length > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm">
-                    <p v-for="(err, field) in form.errors" :key="field" class="text-expense">{{ err }}</p>
+            <div v-if="form.type !== 'transfer'" class="card p-5 md:p-6 space-y-3">
+                <div class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <h2 class="font-semibold">Dividir transacao</h2>
                 </div>
+                <SplitEditor
+                    :model-value="form.splits"
+                    :total-cents="totalCents"
+                    :users="props.users"
+                    :categories="filteredCategories"
+                    :current-user-id="$page.props.auth.user.id"
+                    @update:model-value="onSplitsUpdate"
+                    @error="onSplitsError"
+                />
+            </div>
 
-                <div class="flex items-center gap-2 pt-2">
-                    <button type="submit" class="btn-primary" :disabled="form.processing">
-                        <span v-if="form.processing">Salvando...</span>
-                        <span v-else>{{ props.transaction ? 'Atualizar' : 'Criar transação' }}</span>
-                    </button>
-                    <Link :href="route('transactions.index')" class="btn-ghost">Cancelar</Link>
-                </div>
+            <div v-if="Object.keys(form.errors).length > 0 || splitError" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm">
+                <p v-for="(err, field) in form.errors" :key="field" class="text-expense">{{ err }}</p>
+                <p v-if="splitError" class="text-expense">{{ splitError }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2">
+                <button type="submit" class="btn-primary" :disabled="form.processing || !splitsValid">
+                    <span v-if="form.processing">Salvando...</span>
+                    <span v-else>{{ props.transaction ? 'Atualizar' : 'Criar transação' }}</span>
+                </button>
+                <Link :href="route('transactions.index')" class="btn-ghost">Cancelar</Link>
             </div>
         </form>
     </AuthenticatedLayout>
