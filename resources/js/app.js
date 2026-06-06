@@ -6,6 +6,7 @@ import { createInertiaApp } from '@inertiajs/vue3';
 import { createPinia } from 'pinia';
 import { ZiggyVue } from 'ziggy-js';
 import { route } from 'ziggy-js';
+import VueApexCharts from 'vue3-apexcharts';
 
 const appName = 'Solar';
 
@@ -20,6 +21,7 @@ createInertiaApp({
             .use(plugin)
             .use(createPinia())
             .use(ZiggyVue)
+            .component('Apexchart', VueApexCharts)
             .mount(el);
     },
     progress: {

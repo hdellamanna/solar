@@ -51,9 +51,18 @@ Route::middleware('auth')->group(function () {
     // Transactions
     Route::resource('transactions', TransactionController::class);
 
-    // Placeholders for upcoming features
-    Route::inertia('/budgets', 'Placeholders/Budgets')->name('budgets.index');
-    Route::inertia('/reports', 'Placeholders/Reports')->name('reports.index');
+    // Recurrences (FASE 2A)
+    Route::resource('recurrences', \App\Http\Controllers\RecurrenceController::class);
+    Route::post('/recurrences/{recurrence}/generate-now', [\App\Http\Controllers\RecurrenceController::class, 'generateNow'])
+        ->name('recurrences.generate-now');
+
+    // Budgets (FASE 2B)
+    Route::resource('budgets', \App\Http\Controllers\BudgetController::class);
+    Route::post('/budgets/{budget}/reset', [\App\Http\Controllers\BudgetController::class, 'reset'])
+        ->name('budgets.reset');
+
+    // Reports (FASE 2C)
+    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
