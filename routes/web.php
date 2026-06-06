@@ -61,8 +61,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/budgets/{budget}/reset', [\App\Http\Controllers\BudgetController::class, 'reset'])
         ->name('budgets.reset');
 
-    // Placeholders for upcoming features
-    Route::inertia('/reports', 'Placeholders/Reports')->name('reports.index');
+    // Reports (FASE 2C)
+    Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
