@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\Recurrence;
 use App\Models\Transaction;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -31,6 +32,7 @@ class DatabaseSeeder extends Seeder
         $this->seedCategories();
         $accounts = $this->seedAccounts($user);
         $this->seedTransactions($user, $accounts);
+        $this->seedRecurrences($user);
     }
 
     private function seedCategories(): void
@@ -215,6 +217,48 @@ class DatabaseSeeder extends Seeder
                     'pix_key' => null,
                 ], $r));
             }
+        }
+    }
+
+    /**
+     * Seed 5 realistic recurring rules for the demo user.
+     */
+    public function seedRecurrences(User $user): void
+    {
+        $accounts = Account::where('user_id', $user->id)->get()->keyBy('name');
+        $categories = Category::where(function ($q) use ($user) {
+            $q->where('user_id', $user->id)->orWhereNull('user_id');
+        })->get()->keyBy('name');
+
+        if ($accounts->isEmpty() || $categories->isEmpty()) {
+            return;
+        }
+
+        $rules = [
+            ['Aluguel', 'Moradia', 'expense', 150000, 'monthly', 1500.00],
+            ['Internet', 'Serviços', 'expense', 9900, 'monthly', 99.00],
+            ['Salário Nubank', 'Salário', 'income', 850000, 'monthly', 8500.00],
+            ['Academia', 'Saúde', 'expense', 9999, 'monthly', 99.99],
+            ['Spotify', 'Assinaturas', 'expense', 3299, 'monthly', 32.99],
+        ];
+
+        $now = now();
+        foreach ($rules as $i => [$desc, $catName, $type, $amount, $freq, $real]) {
+            $account = $type === 'income' ? ($accounts['Nubank'] ?? $accounts->first()) : ($accounts['Nubank'] ?? $accounts->first());
+            $category = $categories->get($catName);
+
+            Recurrence::create([
+                'user_id' => $user->id,
+                'account_id' => $account->id,
+                'category_id' => $category?->id,
+                'description' => $desc,
+                'amount_cents' => $amount,
+                'type' => $type,
+                'frequency' => $freq,
+                'starts_at' => $now->copy()->subDays(60 + ($i * 7))->toDateString(),
+                'last_generated_at' => $now->copy()->subDays(30 - ($i * 2))->toDateString(),
+                'active' => true,
+            ]);
         }
     }
 }
