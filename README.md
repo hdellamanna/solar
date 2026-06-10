@@ -1,8 +1,8 @@
 # ☀️ Solar
 
-> Suas finanças pessoais, com luz própria.
+> Your personal finances, with their own light.
 
-**Solar** é um clone modernizado do **Microsoft Money Sunset (2008)**, construído em **Laravel 13 + Vue 3 + Inertia 3** com foco em UX contemporânea estilo fintech brasileira (Nubank/Inter/Will como referência).
+**Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
 ## ✨ Status atual — FASE 3 entregue
 
