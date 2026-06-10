@@ -71,6 +71,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/goals/{goal}/withdraw', [\App\Http\Controllers\GoalController::class, 'withdraw'])
         ->name('goals.withdraw');
 
+    // Subscriptions (FASE 4B) — tracked recurring services
+    Route::resource('subscriptions', \App\Http\Controllers\SubscriptionController::class);
+    Route::post('/subscriptions/{subscription}/toggle-active', [\App\Http\Controllers\SubscriptionController::class, 'toggleActive'])
+        ->name('subscriptions.toggle-active');
+    Route::post('/subscriptions/{subscription}/reactivate', [\App\Http\Controllers\SubscriptionController::class, 'reactivate'])
+        ->name('subscriptions.reactivate');
+
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 

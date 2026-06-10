@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Goal;
+use App\Models\Subscription;
 use App\Models\Transaction;
 use App\Services\ReportService;
 use Carbon\CarbonImmutable;
@@ -109,6 +110,27 @@ class DashboardController extends Controller
                 'color' => $g->color,
             ]);
 
+        // Active subscriptions: total monthly + 3 closest to next billing.
+        $activeSubs = Subscription::where('user_id', $user->id)
+            ->active()
+            ->get();
+
+        $subscriptionsTotalMonthlyCents = (int) $activeSubs->sum('monthly_cents');
+        $upcomingSubscriptions = $activeSubs
+            ->sortBy('days_until_billing')
+            ->take(3)
+            ->map(fn (Subscription $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'amount_cents' => $s->amount_cents,
+                'amount_formatted' => $s->amount_formatted,
+                'next_billing_at' => $s->next_billing_at->toDateString(),
+                'days_until_billing' => $s->days_until_billing,
+                'icon' => $s->icon,
+                'color' => $s->color,
+            ])
+            ->values();
+
         return Inertia::render('Dashboard', [
             'totalBalanceCents' => $totalBalanceCents,
             'monthInflowCents' => $monthInflowCents,
@@ -119,6 +141,11 @@ class DashboardController extends Controller
             'accountCount' => $accounts->count(),
             'monthlyFlow' => $monthlyFlow,
             'goals' => $goals,
+            'subscriptions' => [
+                'total_monthly_cents' => $subscriptionsTotalMonthlyCents,
+                'active_count' => $activeSubs->count(),
+                'upcoming' => $upcomingSubscriptions,
+            ],
         ]);
     }
 }

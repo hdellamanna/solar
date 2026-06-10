@@ -14,6 +14,7 @@ const props = defineProps({
     accounts: { type: Array, default: () => [] },
     monthlyFlow: { type: Array, default: () => [] },
     goals: { type: Array, default: () => [] },
+    subscriptions: { type: Object, default: () => ({}) },
 });
 
 const isDark = useDarkMode();
@@ -114,6 +115,41 @@ const flowOptions = computed(() => useLineConfig({
                         </div>
                     </Link>
                 </div>
+            </div>
+        </div>
+
+        <!-- Subscriptions widget (FASE 4B) -->
+        <div v-if="(props.subscriptions?.active_count ?? 0) > 0" class="card-elevated p-5 md:p-6 mt-4 md:mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-semibold tracking-tight">Assinaturas</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        {{ formatCents(props.subscriptions.total_monthly_cents) }} / mês em {{ props.subscriptions.active_count }} assinatura{{ props.subscriptions.active_count === 1 ? '' : 's' }}
+                    </p>
+                </div>
+                <Link :href="route('subscriptions.index')" class="text-xs text-brand-600 hover:underline">Ver todas</Link>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Link
+                    v-for="s in props.subscriptions.upcoming"
+                    :key="s.id"
+                    :href="route('subscriptions.edit', s.id)"
+                    class="flex items-center gap-3 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                >
+                    <div
+                        class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 transition-transform duration-200 ease-out group-hover:scale-105"
+                        :style="{ backgroundColor: (s.color || '#ef4444') + '1a', color: s.color || '#ef4444' }"
+                    >{{ s.icon || '📺' }}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate">{{ s.name }}</p>
+                        <p class="text-xs text-slate-500">
+                            <span v-if="s.days_until_billing === 0" class="text-expense font-semibold">Cobra hoje</span>
+                            <span v-else-if="s.days_until_billing === 1" class="text-amber-600 font-medium">Cobra amanhã</span>
+                            <span v-else>Em {{ s.days_until_billing }} dias</span>
+                        </p>
+                    </div>
+                    <p class="text-sm font-semibold tabular-nums">{{ s.amount_formatted }}</p>
+                </Link>
             </div>
         </div>
 

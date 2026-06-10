@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Category;
 use App\Models\Goal;
 use App\Models\Recurrence;
+use App\Models\Subscription;
 use App\Models\Tag;
 use App\Models\Transaction;
 use App\Models\User;
@@ -38,6 +39,7 @@ class DatabaseSeeder extends Seeder
         $this->seedRecurrences($user);
         $this->seedTags($user);
         $this->seedGoals($user);
+        $this->seedSubscriptions($user, $accounts);
     }
 
     /**
@@ -322,6 +324,33 @@ class DatabaseSeeder extends Seeder
 
         foreach ($goals as $g) {
             Goal::create(array_merge(['user_id' => $user->id], $g));
+        }
+    }
+
+    /**
+     * Seed 4 demo subscriptions (FASE 4B) for the demo user.
+     */
+    private function seedSubscriptions(User $user, array $accounts): void
+    {
+        if (Subscription::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $defs = [
+            ['name' => 'Netflix',         'amount_cents' => 5599,  'billing_day' => 12, 'icon' => '🎬',  'color' => '#e50914'],
+            ['name' => 'Spotify Família', 'amount_cents' => 2699,  'billing_day' => 18, 'icon' => '🎵',  'color' => '#1db954'],
+            ['name' => 'iCloud+ 200GB',    'amount_cents' => 1490,  'billing_day' => 5,  'icon' => '☁️', 'color' => '#0a84ff'],
+            ['name' => 'Notion Plus',     'amount_cents' => 4000,  'billing_day' => 22, 'icon' => '📝',  'color' => '#000000'],
+        ];
+
+        // Use Nubank (checking) as the default account for all
+        $account = $accounts['Nubank'] ?? null;
+
+        foreach ($defs as $d) {
+            Subscription::create(array_merge(
+                ['user_id' => $user->id, 'currency' => 'BRL', 'active' => true, 'account_id' => $account?->id],
+                $d,
+            ));
         }
     }
 }
