@@ -19,6 +19,7 @@ class UpdateTransactionRequest extends FormRequest
             'destination_account_id' => 'nullable|required_if:type,transfer|exists:accounts,id|different:account_id',
             'category_id' => 'nullable|exists:categories,id',
             'amount' => 'required|numeric|min:0.01',
+            'currency' => 'nullable|string|size:3',
             'date' => 'required|date',
             'description' => 'required|string|max:255',
             'notes' => 'nullable|string',
@@ -26,7 +27,6 @@ class UpdateTransactionRequest extends FormRequest
             'is_pix' => 'boolean',
             'pix_key' => 'nullable|string|max:255',
 
-            // Splits (FASE 3B)
             'splits' => 'sometimes|array|min:2',
             'splits.*.user_id' => 'required_with:splits|integer|exists:users,id',
             'splits.*.category_id' => 'nullable|integer|exists:categories,id',
@@ -36,3 +36,4 @@ class UpdateTransactionRequest extends FormRequest
         ];
     }
 }
+

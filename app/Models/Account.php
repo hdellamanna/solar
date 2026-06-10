@@ -48,13 +48,21 @@ class Account extends Model
     protected $appends = ['balance_cents', 'balance'];
 
     public const TYPES = [
-        'checking' => 'Conta corrente',
-        'savings' => 'Poupança',
-        'credit_card' => 'Cartão de crédito',
-        'cash' => 'Dinheiro',
-        'investment' => 'Investimento',
-        'crypto' => 'Criptomoedas',
+        'checking'        => 'Conta corrente',
+        'savings'         => 'Poupança',
+        'credit_card'     => 'Cartão de crédito',
+        'cash'            => 'Dinheiro',
+        'investment'      => 'Investimento',
+        'crypto'          => 'Criptomoedas',
+        'multi_currency'  => 'Multi-moeda (Wise, Nomad, C6 Global, Inter Global)',
     ];
+
+    /**
+     * Account types that natively hold balances in more than one
+     * currency (FASE 6A). Used by the UI to render the sub-balance
+     * editor and by the dashboard to decide how to aggregate.
+     */
+    public const MULTI_CURRENCY_TYPES = ['multi_currency'];
 
     /**
      * The user that owns the account.
@@ -81,6 +89,14 @@ class Account extends Model
     }
 
     /**
+     * Sub-balances per currency for multi-currency accounts (FASE 6A).
+     */
+    public function balances(): HasMany
+    {
+        return $this->hasMany(AccountBalance::class);
+    }
+
+    /**
      * Computed current balance: initial_balance + signed sum of paid transactions.
      *
      * - For ordinary income/expense, only the source `account_id` matters; the
@@ -101,6 +117,38 @@ class Account extends Model
             ->sum('amount_cents');
 
         return $initial + $outflow + $inflow;
+    }
+
+    /**
+     * True when this account can hold multiple currencies (FASE 6A).
+     */
+    public function getIsMultiCurrencyAttribute(): bool
+    {
+        return in_array($this->type, self::MULTI_CURRENCY_TYPES, true);
+    }
+
+    /**
+     * The home currency of the account (defaults to BRL for
+     * backwards compatibility). Sub-balances in other currencies
+     * live in {@see AccountBalance} rows.
+     */
+    public function getHomeCurrencyAttribute(): string
+    {
+        return strtoupper($this->currency ?: 'BRL');
+    }
+
+    /**
+     * Sub-balance for a specific currency. Returns the home balance
+     * if no sub-balance row exists yet for the requested currency.
+     */
+    public function getBalanceForCurrency(string $currency): int
+    {
+        $currency = strtoupper($currency);
+        if ($currency === $this->home_currency) {
+            return $this->balance_cents;
+        }
+        $row = $this->balances()->where('currency', $currency)->first();
+        return $row ? (int) $row->balance_cents : 0;
     }
 
     /**

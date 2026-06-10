@@ -17,6 +17,7 @@ const form = useForm({
     destination_account_id: props.transaction?.destination_account_id || '',
     category_id: props.transaction?.category_id || '',
     amount: props.transaction ? Math.abs(props.transaction.amount_cents) / 100 : '',
+    currency: props.transaction?.currency || (props.accounts[0]?.currency || 'BRL'),
     date: props.transaction?.date?.split('T')[0] || new Date().toISOString().split('T')[0],
     description: props.transaction?.description || '',
     notes: props.transaction?.notes || '',
@@ -35,6 +36,28 @@ const form = useForm({
 
 const filteredCategories = computed(() => {
     return props.categories.filter(c => c.type === form.type);
+});
+
+const selectedAccount = computed(() => {
+    return props.accounts.find(a => a.id === form.account_id) || null;
+});
+
+const isAccountMultiCurrency = computed(() => {
+    return selectedAccount.value?.type === 'multi_currency';
+});
+
+const availableCurrencies = computed(() => {
+    if (!isAccountMultiCurrency.value) return [selectedAccount.value?.currency || 'BRL'];
+    const set = new Set([selectedAccount.value?.currency || 'BRL']);
+    (selectedAccount.value?.balances || []).forEach(b => set.add(b.currency));
+    return Array.from(set);
+});
+
+watch(() => form.account_id, () => {
+    const acc = props.accounts.find(a => a.id === form.account_id);
+    if (acc) {
+        form.currency = acc.currency || 'BRL';
+    }
 });
 
 watch(() => form.type, () => {
@@ -106,16 +129,30 @@ const submit = () => {
                     <input v-model="form.description" type="text" placeholder="Ex: Almoço, Salário, Conta de luz" class="input" required>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-sm font-medium mb-1">Valor (R$)</label>
-                        <input v-model="form.amount" type="number" step="0.01" min="0.01" placeholder="0,00" class="input text-lg font-semibold" required>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium mb-1">Valor</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">{{ form.currency }}</span>
+                            <input v-model="form.amount" type="number" step="0.01" min="0.01" placeholder="0,00" class="input pl-14 text-lg font-semibold" required>
+                        </div>
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Moeda</label>
+                        <select v-model="form.currency" class="input" :disabled="!isAccountMultiCurrency">
+                            <option v-for="c in availableCurrencies" :key="c" :value="c">{{ c }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-3">
                     <div>
                         <label class="block text-sm font-medium mb-1">Data</label>
                         <input v-model="form.date" type="date" class="input" required>
                     </div>
                 </div>
+                <p v-if="isAccountMultiCurrency" class="text-xs text-slate-500 -mt-2">
+                    Conta multi-moeda: a cotação do dia é capturada automaticamente e gravada na transação.
+                </p>
 
                 <div v-if="form.type !== 'transfer'">
                     <label class="block text-sm font-medium mb-1">Conta</label>

@@ -25,6 +25,10 @@ class StoreAccountRequest extends FormRequest
             'icon' => ['nullable', 'string', 'max:50'],
             'initial_balance_cents' => ['nullable', 'integer', 'min:0'],
             'archived' => ['sometimes', 'boolean'],
+            // Sub-balances for multi_currency accounts (FASE 6A)
+            'balances' => ['sometimes', 'array'],
+            'balances.*.currency' => ['required_with:balances', 'string', 'size:3', 'distinct'],
+            'balances.*.balance_cents' => ['required_with:balances', 'integer'],
         ];
     }
 }

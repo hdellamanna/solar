@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Account;
+use App\Models\AccountBalance;
 use App\Models\Category;
 use App\Models\Goal;
 use App\Models\PixKey;
@@ -30,6 +31,7 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Henrique Demo',
                 'password' => Hash::make('solar123'),
                 'theme' => 'light',
+                'home_currency' => 'BRL',
                 'email_verified_at' => now(),
             ]
         );
@@ -94,20 +96,30 @@ class DatabaseSeeder extends Seeder
     private function seedAccounts(User $user): array
     {
         $defs = [
-            ['name' => 'Nubank', 'type' => 'checking', 'color' => '#820ad1', 'initial_balance_cents' => 350000],
-            ['name' => 'Inter Poupança', 'type' => 'savings', 'color' => '#ff7a00', 'initial_balance_cents' => 1200000],
-            ['name' => 'Itaú Crédito', 'type' => 'credit_card', 'color' => '#ec7000', 'initial_balance_cents' => 0],
-            ['name' => 'Carteira', 'type' => 'cash', 'color' => '#16a34a', 'initial_balance_cents' => 20000],
-            ['name' => 'XP Investimentos', 'type' => 'investment', 'color' => '#000000', 'initial_balance_cents' => 800000],
+            ['name' => 'Nubank', 'type' => 'checking', 'color' => '#820ad1', 'initial_balance_cents' => 350000, 'currency' => 'BRL'],
+            ['name' => 'Inter Poupança', 'type' => 'savings', 'color' => '#ff7a00', 'initial_balance_cents' => 1200000, 'currency' => 'BRL'],
+            ['name' => 'Itaú Crédito', 'type' => 'credit_card', 'color' => '#ec7000', 'initial_balance_cents' => 0, 'currency' => 'BRL'],
+            ['name' => 'Carteira', 'type' => 'cash', 'color' => '#16a34a', 'initial_balance_cents' => 20000, 'currency' => 'BRL'],
+            ['name' => 'XP Investimentos', 'type' => 'investment', 'color' => '#000000', 'initial_balance_cents' => 800000, 'currency' => 'BRL'],
+            // FASE 6A — multi-currency account (Wise)
+            ['name' => 'Wise (Multi-moeda)', 'type' => 'multi_currency', 'color' => '#163300', 'initial_balance_cents' => 50000, 'currency' => 'BRL'],
         ];
 
         $out = [];
         foreach ($defs as $d) {
             $out[$d['name']] = Account::firstOrCreate(
                 ['user_id' => $user->id, 'name' => $d['name']],
-                array_merge($d, ['currency' => 'BRL', 'archived' => false])
+                array_merge($d, ['archived' => false])
             );
         }
+
+        // Sub-balances for the Wise multi-currency account
+        $wise = $out['Wise (Multi-moeda)'] ?? null;
+        if ($wise && !AccountBalance::where('account_id', $wise->id)->exists()) {
+            AccountBalance::create(['account_id' => $wise->id, 'currency' => 'USD', 'balance_cents' => 85000]);   // $850
+            AccountBalance::create(['account_id' => $wise->id, 'currency' => 'EUR', 'balance_cents' => 32000]);   // €320
+        }
+
         return $out;
     }
 

@@ -10,6 +10,7 @@ use App\Models\Category;
 use App\Models\Transaction;
 use App\Models\TransactionSplit;
 use App\Models\User;
+use App\Services\FxRateService;
 use App\Services\TransactionFilterService;
 use App\Services\TransactionSplitService;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,10 @@ use Inertia\Response;
 
 class TransactionController extends Controller
 {
-    public function __construct(private readonly TransactionSplitService $splits) {}
+    public function __construct(
+        private readonly TransactionSplitService $splits,
+        private readonly FxRateService $fx,
+    ) {}
 
     /**
      * Display a paginated list of transactions with optional filters.
@@ -68,6 +72,10 @@ class TransactionController extends Controller
         };
 
         $userId = auth()->id();
+        $account = Account::where('user_id', $userId)->findOrFail($data['account_id']);
+        $currency = strtoupper($data['currency'] ?? $account->home_currency);
+        $exchangeRateCents = $this->resolveExchangeRate($account->home_currency, $currency, $data['date']);
+
         $tx = Transaction::create([
             'user_id' => $userId,
             'account_id' => $data['account_id'],
@@ -75,6 +83,8 @@ class TransactionController extends Controller
             'category_id' => $data['category_id'] ?? null,
             'type' => $data['type'],
             'amount_cents' => $signed,
+            'currency' => $currency,
+            'exchange_rate_cents' => $exchangeRateCents,
             'date' => $data['date'],
             'description' => $data['description'],
             'notes' => $data['notes'] ?? null,
@@ -117,12 +127,18 @@ class TransactionController extends Controller
             default => $amountCents,
         };
 
+        $account = Account::where('user_id', auth()->id())->findOrFail($data['account_id']);
+        $currency = strtoupper($data['currency'] ?? $account->home_currency);
+        $exchangeRateCents = $this->resolveExchangeRate($account->home_currency, $currency, $data['date']);
+
         $transaction->update([
             'account_id' => $data['account_id'],
             'destination_account_id' => $data['destination_account_id'] ?? null,
             'category_id' => $data['category_id'] ?? null,
             'type' => $data['type'],
             'amount_cents' => $signed,
+            'currency' => $currency,
+            'exchange_rate_cents' => $exchangeRateCents,
             'date' => $data['date'],
             'description' => $data['description'],
             'notes' => $data['notes'] ?? null,
@@ -140,6 +156,24 @@ class TransactionController extends Controller
         }
 
         return redirect()->route('transactions.index')->with('success', 'Transação atualizada.');
+    }
+
+    /**
+     * Snapshot the FX rate at the transaction's date so historical
+     * reports stay correct after the live rate moves. Returns
+     * `null` (no snapshot) when the transaction is in the
+     * account's home currency, or when the rate cannot be fetched.
+     */
+    private function resolveExchangeRate(string $homeCurrency, string $transactionCurrency, string $date): ?int
+    {
+        if ($homeCurrency === $transactionCurrency) {
+            return null;
+        }
+        $rate = $this->fx->rate($transactionCurrency, $homeCurrency, $date);
+        if ($rate === null) {
+            return null;
+        }
+        return (int) round($rate * 100);
     }
 
     /**

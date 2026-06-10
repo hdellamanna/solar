@@ -18,6 +18,7 @@ class User extends Authenticatable
         'email',
         'password',
         'theme',
+        'home_currency',
     ];
 
     protected $hidden = [
@@ -30,7 +31,14 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'use_ai_categorize' => 'boolean',
         ];
+    }
+
+    /** Default ISO-4217 home currency (3-letter). FASE 6A. */
+    public function getHomeCurrencyAttribute(): string
+    {
+        return strtoupper($this->attributes['home_currency'] ?? 'BRL');
     }
 
     /**

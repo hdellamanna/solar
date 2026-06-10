@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $account_id
  * @property int|null $destination_account_id
  * @property int|null $category_id
+ * @property int|null $recurrence_id
  * @property string $type
  * @property int $amount_cents
  * @property string $date
@@ -29,7 +30,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $status
  * @property bool $is_pix
  * @property string|null $pix_key
- * @property int|null $recurrence_id
+ * @property string|null $currency ISO-4217 3-letter (BRL, USD, EUR, GBP); nullable for legacy
+ * @property int|null $exchange_rate_cents 1 unit of currency = N/100 of user's home currency, captured at creation time
  */
 class Transaction extends Model
 {
@@ -41,22 +43,50 @@ class Transaction extends Model
         'account_id',
         'destination_account_id',
         'category_id',
+        'recurrence_id',
         'type',
         'amount_cents',
+        'currency',
+        'exchange_rate_cents',
         'date',
         'description',
         'notes',
         'status',
         'is_pix',
         'pix_key',
-        'recurrence_id',
     ];
 
     protected $casts = [
         'amount_cents' => 'integer',
+        'exchange_rate_cents' => 'integer',
         'date' => 'date:Y-m-d',
         'is_pix' => 'boolean',
     ];
+
+    /**
+     * Currency of the transaction. Defaults to the account's home
+     * currency when null. FASE 6A.
+     */
+    public function getCurrencyAttribute(?string $value): string
+    {
+        if ($value) {
+            return strtoupper($value);
+        }
+        return $this->account?->home_currency ?? 'BRL';
+    }
+
+    /**
+     * Exchange rate captured at creation time, in cents (1 unit of
+     * `currency` = `exchange_rate_cents/100` of the user's home
+     * currency). Null when transaction is in the user's home
+     * currency or for legacy rows pre-FASE 6A. FASE 6A.
+     */
+    public function getExchangeRateCentsAttribute(): ?int
+    {
+        return $this->attributes['exchange_rate_cents'] !== null
+            ? (int) $this->attributes['exchange_rate_cents']
+            : null;
+    }
 
     protected $appends = ['amount_decimal', 'signed_amount', 'tag_list'];
 

@@ -19,6 +19,7 @@ class StoreTransactionRequest extends FormRequest
             'destination_account_id' => 'nullable|required_if:type,transfer|exists:accounts,id|different:account_id',
             'category_id' => 'nullable|exists:categories,id',
             'amount' => 'required|numeric|min:0.01',
+            'currency' => 'nullable|string|size:3',
             'date' => 'required|date',
             'description' => 'required|string|max:255',
             'notes' => 'nullable|string',
