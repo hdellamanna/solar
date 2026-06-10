@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Account;
+use App\Models\Goal;
 use App\Models\Transaction;
 use App\Services\ReportService;
 use Carbon\CarbonImmutable;
@@ -86,6 +87,28 @@ class DashboardController extends Controller
         // Cash-flow line chart series for the last N months.
         $monthlyFlow = $this->reports->monthlyFlow($user, self::FLOW_MONTHS);
 
+        // Top 3 in-progress goals (closest to deadline first) for the dashboard widget.
+        $goals = Goal::where('user_id', $user->id)
+            ->active()
+            ->inProgress()
+            ->orderByRaw('CASE WHEN deadline IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('deadline')
+            ->orderByDesc('created_at')
+            ->limit(3)
+            ->get()
+            ->map(fn (Goal $g) => [
+                'id' => $g->id,
+                'name' => $g->name,
+                'target_amount_cents' => $g->target_amount_cents,
+                'current_amount_cents' => $g->current_amount_cents,
+                'progress_percent' => $g->progress_percent,
+                'remaining_cents' => $g->remaining_cents,
+                'deadline' => $g->deadline?->toDateString(),
+                'days_remaining' => $g->days_remaining,
+                'icon' => $g->icon,
+                'color' => $g->color,
+            ]);
+
         return Inertia::render('Dashboard', [
             'totalBalanceCents' => $totalBalanceCents,
             'monthInflowCents' => $monthInflowCents,
@@ -95,6 +118,7 @@ class DashboardController extends Controller
             'accounts' => $accountsData,
             'accountCount' => $accounts->count(),
             'monthlyFlow' => $monthlyFlow,
+            'goals' => $goals,
         ]);
     }
 }

@@ -13,6 +13,7 @@ const props = defineProps({
     recentTransactions: { type: Array, default: () => [] },
     accounts: { type: Array, default: () => [] },
     monthlyFlow: { type: Array, default: () => [] },
+    goals: { type: Array, default: () => [] },
 });
 
 const isDark = useDarkMode();
@@ -80,6 +81,43 @@ const flowOptions = computed(() => useLineConfig({
                 </div>
             </div>
 
+            <!-- Goals widget (FASE 4A) -->
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-semibold">Metas em andamento</h2>
+                    <Link :href="route('goals.index')" class="text-xs text-brand-600 hover:underline">Ver todas</Link>
+                </div>
+                <div v-if="props.goals.length === 0" class="text-center py-4 text-sm text-slate-400">
+                    Nenhuma meta ativa.
+                    <Link :href="route('goals.create')" class="block mt-1 text-brand-600 hover:underline">Criar meta</Link>
+                </div>
+                <div v-else class="space-y-3">
+                    <Link
+                        v-for="g in props.goals"
+                        :key="g.id"
+                        :href="route('goals.edit', g.id)"
+                        class="block group"
+                    >
+                        <div class="flex items-center gap-2 mb-1">
+                            <span
+                                class="w-6 h-6 rounded-md flex items-center justify-center text-sm shrink-0"
+                                :style="{ backgroundColor: (g.color || '#f59e0b') + '20', color: g.color || '#f59e0b' }"
+                            >{{ g.icon || '🎯' }}</span>
+                            <span class="text-sm font-medium flex-1 truncate">{{ g.name }}</span>
+                            <span class="text-xs text-slate-500 tabular-nums">{{ g.progress_percent }}%</span>
+                        </div>
+                        <div class="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden ml-8">
+                            <div
+                                class="h-full rounded-full transition-all"
+                                :style="{ width: g.progress_percent + '%', backgroundColor: g.color || '#f59e0b' }"
+                            ></div>
+                        </div>
+                    </Link>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6">
             <!-- Accounts list -->
             <div class="card p-5">
                 <div class="flex items-center justify-between mb-3">

@@ -64,6 +64,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/budgets/{budget}/reset', [\App\Http\Controllers\BudgetController::class, 'reset'])
         ->name('budgets.reset');
 
+    // Goals (FASE 4A) — savings goals
+    Route::resource('goals', \App\Http\Controllers\GoalController::class);
+    Route::post('/goals/{goal}/contribute', [\App\Http\Controllers\GoalController::class, 'contribute'])
+        ->name('goals.contribute');
+    Route::post('/goals/{goal}/withdraw', [\App\Http\Controllers\GoalController::class, 'withdraw'])
+        ->name('goals.withdraw');
+
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 

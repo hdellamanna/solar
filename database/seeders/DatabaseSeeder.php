@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Account;
 use App\Models\Category;
+use App\Models\Goal;
 use App\Models\Recurrence;
 use App\Models\Tag;
 use App\Models\Transaction;
@@ -36,6 +37,7 @@ class DatabaseSeeder extends Seeder
         $this->seedTransactions($user, $accounts);
         $this->seedRecurrences($user);
         $this->seedTags($user);
+        $this->seedGoals($user);
     }
 
     /**
@@ -279,6 +281,47 @@ class DatabaseSeeder extends Seeder
                 'last_generated_at' => $now->copy()->subDays(30 - ($i * 2))->toDateString(),
                 'active' => true,
             ]);
+        }
+    }
+
+    /**
+     * Seed 3 demo goals for the demo user (FASE 4A).
+     */
+    private function seedGoals(User $user): void
+    {
+        if (Goal::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $goals = [
+            [
+                'name' => 'Reserva de emergência',
+                'target_amount_cents' => 1_500_000, // R$ 15.000
+                'current_amount_cents' => 420_000,  // R$ 4.200 (28%)
+                'deadline' => now()->addMonths(12)->toDateString(),
+                'icon' => '🛟',
+                'color' => '#10b981',
+            ],
+            [
+                'name' => 'Viagem para o Chile',
+                'target_amount_cents' => 800_000, // R$ 8.000
+                'current_amount_cents' => 640_000, // R$ 6.400 (80%)
+                'deadline' => now()->addMonths(4)->toDateString(),
+                'icon' => '✈️',
+                'color' => '#3b82f6',
+            ],
+            [
+                'name' => 'Notebook novo',
+                'target_amount_cents' => 600_000, // R$ 6.000
+                'current_amount_cents' => 0,
+                'deadline' => now()->addMonths(8)->toDateString(),
+                'icon' => '💻',
+                'color' => '#8b5cf6',
+            ],
+        ];
+
+        foreach ($goals as $g) {
+            Goal::create(array_merge(['user_id' => $user->id], $g));
         }
     }
 }
