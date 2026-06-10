@@ -4,9 +4,9 @@
 
 **Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
-## ✨ Current status — FASE 4A delivered
+## ✨ Current status — FASE 4C delivered
 
-Phases **1**, **2**, **3** and **4A** are complete and merged. The rest of phase 4 (subscriptions, PIX UI) plus phases 5–10 are pending.
+Phases **1**, **2**, **3** and **4A / 4B / 4C** are complete and merged. Phases 5–10 are pending.
 
 ### FASE 1 — Foundation ✅
 - 🔐 **Full auth** — registration, login, logout, middleware
@@ -38,6 +38,22 @@ Phases **1**, **2**, **3** and **4A** are complete and merged. The rest of phase
 - 🛟 **Soft archive** keeps history without deleting
 - 📊 **Dashboard widget** surfaces the top 3 in-progress goals (closest deadline first)
 - 🧮 14 feature tests covering CRUD, contribute / withdraw, validation, isolation, achieved stamping, and progress cap at 100%
+
+### FASE 4B — Tracked subscriptions ✅
+- 📺 **Subscriptions CRUD** (Netflix, Spotify, iCloud, etc) with `billing_day`, amount, account, category, icon, color
+- ⏸️ **Pause / reactivate** — paused subs are kept visible but excluded from monthly totals; cancelled subs are soft-archived
+- 📅 **Auto-derived `next_billing_at`** from `billing_day` (rolls to next month when the day has already passed)
+- 📊 **Dashboard widget** with monthly total + 3 closest to next billing
+- 💸 Monthly and yearly projections per subscription
+- 🧪 13 feature tests covering CRUD, pause / reactivate, billing-day roll-over, validation, isolation, dashboard widget
+
+### FASE 4C — Dedicated PIX UI ✅
+- 💸 **`/pix` screen** with monthly totals (received, sent, count), recent PIX transactions, saved keys, and most-used keys
+- 🔑 **Saved PIX keys** (`pix_keys` table) with label, type (cpf / cnpj / email / phone / evp), primary flag
+- 🧾 **Mock BR Code generator** — bottom-sheet on mobile, modal on desktop, builds a copy-pasteable string in the simplified EMV format (not scannable — the point is the UX, not real settlement)
+- 🪪 **Key type auto-detection** (`usePix` composable: `classifyPixKey`, `maskPixKey`, `pixKeyTypeInfo`)
+- 🎨 Apple-style bottom sheet with slide-up transition, auto-validating key, "Copiar" with `navigator.clipboard` + fallback
+- 🧪 6 feature tests covering isolation, top-keys grouping, saved-keys, month totals
 
 ## 🚀 Quick start
 
@@ -74,8 +90,8 @@ php artisan test
 Current result:
 
 ```
-Tests:  86 passed (367 assertions)
-Duration: 1.23s
+Tests:  105 passed (498 assertions)
+Duration: 1.36s
 ```
 
 Coverage by feature:
@@ -90,6 +106,8 @@ Coverage by feature:
 - **Search** — global search by description, notes, amount, isolation
 - **API auth** — `/api/*` uses session auth, not tokens
 - **Goals (FASE 4A)** — CRUD, contribute / withdraw, achieved stamping, progress cap, isolation
+- **Subscriptions (FASE 4B)** — CRUD, pause / reactivate, billing-day roll-over, validation, isolation, dashboard widget
+- **PIX (FASE 4C)** — isolation, top-keys grouping, saved-keys, month totals
 
 ## 🏗️ Stack
 
@@ -117,8 +135,8 @@ app/
     Requests/     # FormRequests per resource (Store / Update)
     Middleware/   # HandleInertiaRequests (shares auth.user)
 database/
-  migrations/     # 17 migrations, soft deletes + indexes
-  seeders/        # 1 demo user, 5 accounts, 15 categories, ~170 transactions, 8 tags, 3 goals
+  migrations/     # 19 migrations, soft deletes + indexes
+  seeders/        # 1 demo user, 5 accounts, 15 categories, ~170 transactions, 8 tags, 3 goals, 4 subscriptions, 3 saved PIX keys
 resources/js/
   Pages/
     Auth/         # Login, Register
@@ -128,10 +146,12 @@ resources/js/
     Budgets/      # Index
     Recurrences/  # Index, Create, Edit
     Goals/        # Index, Create, Edit (FASE 4A)
+    Subscriptions/# Index, Create, Edit (FASE 4B)
+    Pix/          # Index (FASE 4C) — dedicated PIX UI with BR Code generator
     Reports/      # Index (ApexCharts: line, donut, bar, horizontal)
     Profile/      # Edit
   Layouts/        # AuthenticatedLayout (sidebar + bottom bar), GuestLayout
-  Composables/    # useFormat, useShortcuts, useChart (useLineConfig / useDonutConfig / useBarConfig), useTag, useTransactionFilters, useGlobalSearch
+  Composables/    # useFormat, useShortcuts, useChart (useLineConfig / useDonutConfig / useBarConfig), useTag, useTransactionFilters, useGlobalSearch, usePix (FASE 4C)
   app.js          # createInertiaApp + Pinia + Ziggy + ApexCharts global
 ```
 
@@ -233,6 +253,29 @@ erDiagram
         string color
         timestamp achieved_at "nullable"
         timestamp archived_at "nullable"
+    }
+    SUBSCRIPTIONS {
+        int id PK
+        int user_id FK
+        string name
+        int amount_cents
+        string currency
+        int billing_day
+        int account_id FK "nullable"
+        int category_id FK "nullable"
+        int recurrence_id FK "nullable, FASE 4B unused"
+        string icon
+        string color
+        bool active
+        timestamp cancelled_at "nullable"
+    }
+    PIX_KEYS {
+        int id PK
+        int user_id FK
+        string label
+        string key
+        string type "cpf|cnpj|email|phone|evp"
+        bool is_primary
     }
 ```
 
