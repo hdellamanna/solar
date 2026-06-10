@@ -305,14 +305,66 @@ erDiagram
 | 2     | ✅ done | Recurrences + Budgets + Reports (ApexCharts)                                            |
 | 3     | ✅ done | Tags + Splits + Global search + Advanced filters                                        |
 | 4A    | ✅ done | Savings goals with dashboard widget                                                     |
-| 4B    | ⏳ next | Tracked subscriptions (Netflix, Spotify, etc)                                           |
-| 4C    | ⏳ next | Dedicated PIX UI (history, copy / paste, mock BR Code)                                  |
-| 5     | ⏳ todo | Investments + Debts + AI categorize + PWA                                               |
-| 6     | ⏳ todo | Multi-currency + Couples mode + OFX / CSV import + OCR                                   |
-| 7     | ⏳ todo | Tri-lingual i18n (pt-BR, es, en) with 3 names per category / tag                         |
-| 8     | ⏳ todo | AI financial advisor (rule-based MVP + optional Groq integration)                        |
-| 9     | ⏳ todo | Crypto tracker (live price via CoinGecko, P&L)                                           |
-| 10    | ⏳ todo | Polish + E2E tests (Playwright) + Deploy                                                |
+| 4B    | ✅ done | Tracked subscriptions with dashboard widget (Apple-style UI)                             |
+| 4C    | ✅ done | Dedicated PIX UI with saved keys and mock BR Code generator                              |
+| 5     | ⏳ todo | [Investments](#fase-5--investments--dívidas--ia-categorize--pwa)                         |
+| 6     | ⏳ todo | [Multi-currency + Couples + OFX/CSV + OCR](#fase-6--multi-moeda--casal--ofxcsv--ocr)     |
+| 7     | ⏳ todo | [Tri-lingual i18n](#fase-7--i18n-tri-língue)                                              |
+| 8     | ⏳ todo | [AI financial advisor](#fase-8--ai-insights)                                              |
+| 9     | ⏳ todo | [Crypto tracker](#fase-9--crypto)                                                         |
+| 10    | ⏳ todo | [Polish + E2E + Tauri installer](#fase-10--polish--e2e--tauri-installer)                  |
+
+### FASE 5 — Investments + Debts + AI categorize + PWA
+
+The biggest stretch so far, with four independent features sharing a single milestone.
+
+- **Investments** — `Investments` model with type (stock / fund / crypto / fixed-income / treasury), ticker, quantity, average price, current value (manual at first, with the door open for live quotes). CRUD + dashboard widget with allocation by class and total portfolio value. P&L computed from average price × current price.
+- **Debts** — `Debts` model with creditor, total balance, interest rate, monthly payment, start date, payoff strategy. CRUD + dashboard widget with total debt + monthly commitment. Built-in **SAC vs Price amortization simulator** that produces a month-by-month schedule showing how each strategy pays off the debt over time.
+- **AI categorize** — opt-in `users.use_ai_categorize` flag (off by default for privacy). When the user types a transaction description, a "✨ Sugerir com IA" button calls `POST /api/ai/suggest-category`, which prefers **Groq's `llama-3.3-70b-versatile`** (the key is already configured in `.env`) and falls back to a built-in **keyword-based RulesProvider** that recognizes 100+ pt-BR merchants across all 8 default categories. Results are cached for 30 days per user. The rules provider works fully offline — the LLM is an upgrade, not a requirement.
+- **PWA** — `manifest.json`, service worker with cache-first strategy for static assets and network-first for the API, an install prompt component, maskable icons (192/256/384/512), splash screen, and `apple-mobile-web-app-capable` meta tags. The app becomes installable on iOS, Android, and desktop, and the shell stays available offline.
+
+### FASE 6 — Multi-currency + Couples + OFX/CSV + OCR
+
+Brings the app from a single-user / single-currency tool to a household-scale utility.
+
+- **Multi-currency** — `accounts.currency` already exists, so FASE 6 adds FX conversion (rates cached daily, source: a free public endpoint), per-account balance in the user's home currency, and a per-transaction FX snapshot so historical reports stay correct after rate changes.
+- **Couples mode** — `households` table + `household_users` pivot with `owner` / `member` roles. Shared accounts, shared goals, shared budgets, with private transactions (marked `is_private`) still hidden from the partner. Invitation flow via signed URL.
+- **OFX / CSV import** — bulk import of bank statements (OFX for fidelity, CSV with column mapping for flexibility). Auto-categorize using the FASE 5 AI, with a per-row review screen before commit. Deduplication by hash + amount + date.
+- **OCR (mock)** — "scan receipt" flow that lets the user upload a photo and pre-fills a transaction form. The mock uses deterministic fake data; the production version would wire Tesseract or a cloud OCR provider.
+
+### FASE 7 — i18n tri-língue
+
+The interface learns the user's preferred language. **Critical architectural decision:** localized entities (Category, Tag, and any other translatable row) stay **a single row in the database** — there are no per-language duplicates. The 3 names live as columns (`name_pt`, `name_es`, `name_en`) on the same row, so changing locale never breaks database references.
+
+- **Backend** — Laravel's built-in `__()` for static strings (`lang/{pt-BR,es,en}.json`), middleware that sets the app locale from `users.locale` (falls back to `Accept-Language` for guests), and accessors on the localized models: `Category::displayName($locale)`.
+- **Frontend** — `vue-i18n` wired into the Inertia app, with a tiny composable that picks the right column based on the active locale. Empty-column fallback to the user's primary locale.
+- **UI** — language picker in `/profile` with 3 options; when changed, the next page load is fully translated.
+- **Seeders** — default categories and tags get all 3 names on first migration.
+
+### FASE 8 — AI insights
+
+Bigger, broader AI than FASE 5's "categorize one transaction". A scheduled weekly digest + on-demand "ask the AI" panel.
+
+- **Rule-based MVP** (free, offline, ships first) — top spending category, week-over-week delta, projected month-end balance, accounts that will go negative this month, recurring charges that just hit.
+- **Groq integration** (opt-in, same key) — generates a 2-paragraph natural-language summary of the rule-based insights in the user's language. Falls back to a templated summary if Groq is unavailable.
+- **Cron job** — runs every Sunday at 20:00 (user's tz) and writes an `Insight` record that shows up in the dashboard.
+- **On-demand panel** — a chat-like UI that lets the user ask "quanto gastei em delivery esse mês?" or "qual conta tá mais próxima de zerar?". Questions are answered from cached aggregates, not by querying the DB live (cheap + consistent).
+
+### FASE 9 — Crypto
+
+Tracks the user's crypto positions alongside the rest of the portfolio.
+
+- **Investments expansion** — the `Investments` model from FASE 5 already supports the `crypto` type. FASE 9 adds **live price fetching** via CoinGecko's free API (10-30 req/min, no key) cached 5 minutes per coin.
+- **Trades** — `Trades` model (buy / sell) with quantity, unit price, fee, exchange, trade date. Computes average price per holding and realized / unrealized P&L.
+- **Dashboard widget** — total crypto value, top mover (24h), gainers vs losers.
+
+### FASE 10 — Polish + E2E + Tauri installer
+
+The final stretch before the project is genuinely shippable.
+
+- **E2E tests** — Playwright suite covering the critical paths: register, create an account, add a transaction, see it on the dashboard, create a goal, contribute to it. Headless in CI.
+- **CI** — GitHub Actions pipeline: lint (php-cs-fixer / eslint), static analysis (phpstan / vue-tsc), unit + feature tests on PR, build verification, deploy on `main` if green.
+- **Tauri installer** — wrap the Laravel + Vue + SQLite bundle in a Tauri shell, producing signed `.dmg` (macOS), `.msi` (Windows), and `.AppImage` (Linux). The user double-clicks and the app opens its own window with the full backend running locally — no PHP install, no Node install, no terminal. Auto-update via `tauri-updater`.
 
 ## 🤝 Contributing
 
