@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Account;
 use App\Models\Category;
 use App\Models\Goal;
+use App\Models\PixKey;
 use App\Models\Recurrence;
 use App\Models\Subscription;
 use App\Models\Tag;
@@ -40,6 +41,7 @@ class DatabaseSeeder extends Seeder
         $this->seedTags($user);
         $this->seedGoals($user);
         $this->seedSubscriptions($user, $accounts);
+        $this->seedPixKeys($user);
     }
 
     /**
@@ -351,6 +353,26 @@ class DatabaseSeeder extends Seeder
                 ['user_id' => $user->id, 'currency' => 'BRL', 'active' => true, 'account_id' => $account?->id],
                 $d,
             ));
+        }
+    }
+
+    /**
+     * Seed 3 saved PIX keys (FASE 4C) for the demo user.
+     */
+    private function seedPixKeys(User $user): void
+    {
+        if (PixKey::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $keys = [
+            ['label' => 'Aluguel',     'key' => 'amigo@email.com',     'type' => 'email', 'is_primary' => false],
+            ['label' => 'Freelancer',  'key' => 'cliente@empresa.com', 'type' => 'email', 'is_primary' => true],
+            ['label' => 'Restaurante', 'key' => '+55 11 99876-5432',  'type' => 'phone', 'is_primary' => false],
+        ];
+
+        foreach ($keys as $k) {
+            PixKey::create(array_merge(['user_id' => $user->id], $k));
         }
     }
 }

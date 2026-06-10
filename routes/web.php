@@ -78,6 +78,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/subscriptions/{subscription}/reactivate', [\App\Http\Controllers\SubscriptionController::class, 'reactivate'])
         ->name('subscriptions.reactivate');
 
+    // PIX (FASE 4C) — dedicated PIX UI
+    Route::get('/pix', [\App\Http\Controllers\PixController::class, 'index'])->name('pix.index');
+
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
