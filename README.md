@@ -4,9 +4,9 @@
 
 **Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
-## ✨ Current status — FASE 4C delivered
+## ✨ Current status — FASE 6A delivered
 
-Phases **1**, **2**, **3** and **4A / 4B / 4C** are complete and merged. Phases 5–10 are pending.
+Phases **1**, **2**, **3**, **4A / 4B / 4C** and **6A** are complete and merged. Phases 5, 6B, 7, 8, 9, 10 are pending.
 
 ### FASE 1 — Foundation ✅
 - 🔐 **Full auth** — registration, login, logout, middleware
@@ -55,6 +55,16 @@ Phases **1**, **2**, **3** and **4A / 4B / 4C** are complete and merged. Phases 
 - 🎨 Apple-style bottom sheet with slide-up transition, auto-validating key, "Copiar" with `navigator.clipboard` + fallback
 - 🧪 6 feature tests covering isolation, top-keys grouping, saved-keys, month totals
 
+### FASE 6A — Multi-currency (Wise / Nomad / C6 Global / Inter Global) ✅
+- 🌐 **Sub-balances per currency on a single account** — `account_balances` table with `unique(account_id, currency)`, so one account can hold BRL **and** USD (and EUR, GBP) at the same time. This is the actual behaviour of Wise, Nomad Global, C6 Global and Inter Global.
+- 💱 **Per-transaction FX snapshot** — `transactions.currency` and `transactions.exchange_rate_cents` capture the rate at creation time, so historical reports stay correct even when the live rate moves.
+- 🏠 **User home currency** — `users.home_currency` (default BRL) is the reporting currency. Every dashboard aggregate (total balance, month inflow / outflow) is converted to it via cached FX rates.
+- 📡 **FxRateService** — backed by [frankfurter.app](https://frankfurter.app) (free ECB reference rates, no API key). 12-hour cache per `(base, quote, date)` tuple. Returns `1.0` for same currency, `null` on upstream failure (callers gracefully fall back to native-currency amounts).
+- 🆕 **New account type** — `multi_currency` joined the existing `checking / savings / credit_card / cash / investment / crypto` set. The Create / Edit forms swap the layout when this type is selected: a primary-currency field plus a one-click sub-balances editor (`+ Adicionar moeda`).
+- 🎨 Apple-style sub-balances card on the Accounts index — home balance in big numbers, a thin divider, then the sub-balances listed under it in tabular-nums.
+- 🌱 **Demo seed** — the demo user now starts with 6 accounts including a `Wise (Multi-moeda)` holding BRL 50.00 (home) + USD 850.00 + EUR 320.00, so the FASE 6A UI is visible immediately after `migrate:fresh --seed`.
+- 🧪 15 new feature tests — `AccountBalanceTest` (6) and `FxRateServiceTest` (9) with `Http::fake()` covering the rate, cache, date snapshots, refresh, and graceful failures.
+
 ## 🚀 Quick start
 
 ```bash
@@ -90,8 +100,8 @@ php artisan test
 Current result:
 
 ```
-Tests:  105 passed (498 assertions)
-Duration: 1.36s
+Tests:  120 passed (532 assertions)
+Duration: 1.47s
 ```
 
 Coverage by feature:
@@ -108,6 +118,7 @@ Coverage by feature:
 - **Goals (FASE 4A)** — CRUD, contribute / withdraw, achieved stamping, progress cap, isolation
 - **Subscriptions (FASE 4B)** — CRUD, pause / reactivate, billing-day roll-over, validation, isolation, dashboard widget
 - **PIX (FASE 4C)** — isolation, top-keys grouping, saved-keys, month totals
+- **Multi-currency (FASE 6A)** — sub-balances CRUD, isolation, FxRateService cache + dates + failure modes
 
 ## 🏗️ Stack
 
@@ -128,19 +139,19 @@ Coverage by feature:
 
 ```
 app/
-  Models/         # User, Account, Category, Transaction, Recurrence, Budget, Tag, TransactionSplit, Goal
-  Services/       # ReportService (monthlyFlow, categoryBreakdown, kpis, ...), RecurrenceService, TransactionFilterService, TransactionSplitService
+  Models/         # User, Account, Category, Transaction, Recurrence, Budget, Tag, TransactionSplit, Goal, Subscription, PixKey, AccountBalance (FASE 6A)
+  Services/       # ReportService (monthlyFlow, categoryBreakdown, kpis, ...), RecurrenceService, TransactionFilterService, TransactionSplitService, FxRateService (FASE 6A, frankfurter.app)
   Http/
     Controllers/  # Account*, Auth/*, Budget*, Dashboard*, Goal*, Profile*, Recurrence*, Report*, Tag*, Transaction*
     Requests/     # FormRequests per resource (Store / Update)
     Middleware/   # HandleInertiaRequests (shares auth.user)
 database/
-  migrations/     # 19 migrations, soft deletes + indexes
-  seeders/        # 1 demo user, 5 accounts, 15 categories, ~170 transactions, 8 tags, 3 goals, 4 subscriptions, 3 saved PIX keys
+  migrations/     # 22 migrations, soft deletes + indexes (FASE 6A adds account_balances, users.home_currency, transactions.currency + exchange_rate)
+  seeders/        # 1 demo user, 6 accounts (incl. Wise multi-currency), 15 categories, ~155 transactions, 8 tags, 3 goals, 4 subscriptions, 3 saved PIX keys, 2 sub-balances
 resources/js/
   Pages/
     Auth/         # Login, Register
-    Accounts/     # Index, Create, Edit
+    Accounts/     # Index, Create, Edit (Create / Edit render the sub-balances editor when type=multi_currency)
     Transactions/ # Index, Form, Show
     Tags/         # Index (cards grid)
     Budgets/      # Index
@@ -277,6 +288,12 @@ erDiagram
         string type "cpf|cnpj|email|phone|evp"
         bool is_primary
     }
+    ACCOUNT_BALANCES {
+        int id PK
+        int account_id FK
+        string currency "ISO-4217, e.g. BRL, USD, EUR, GBP"
+        int balance_cents
+    }
 ```
 
 **Money convention:** all amounts are stored as `int` cents. Conversion to BRL (division by 100) only happens in the presentation layer.
@@ -308,7 +325,8 @@ erDiagram
 | 4B    | ✅ done | Tracked subscriptions with dashboard widget (Apple-style UI)                             |
 | 4C    | ✅ done | Dedicated PIX UI with saved keys and mock BR Code generator                              |
 | 5     | ⏳ todo | [Investments](#fase-5--investments--dívidas--ia-categorize--pwa)                         |
-| 6     | ⏳ todo | [Multi-currency + Couples + OFX/CSV + OCR](#fase-6--multi-moeda--casal--ofxcsv--ocr)     |
+| 6A    | ✅ done | Multi-currency accounts (Wise / Nomad / C6 Global / Inter Global) with FX snapshot         |
+| 6B    | ⏳ todo | Couples mode + OFX / CSV import + OCR                                                     |
 | 7     | ⏳ todo | [Tri-lingual i18n](#fase-7--i18n-tri-língue)                                              |
 | 8     | ⏳ todo | [AI financial advisor](#fase-8--ai-insights)                                              |
 | 9     | ⏳ todo | [Crypto tracker](#fase-9--crypto)                                                         |
@@ -323,11 +341,14 @@ The biggest stretch so far, with four independent features sharing a single mile
 - **AI categorize** — opt-in `users.use_ai_categorize` flag (off by default for privacy). When the user types a transaction description, a "✨ Sugerir com IA" button calls `POST /api/ai/suggest-category`, which prefers **Groq's `llama-3.3-70b-versatile`** (the key is already configured in `.env`) and falls back to a built-in **keyword-based RulesProvider** that recognizes 100+ pt-BR merchants across all 8 default categories. Results are cached for 30 days per user. The rules provider works fully offline — the LLM is an upgrade, not a requirement.
 - **PWA** — `manifest.json`, service worker with cache-first strategy for static assets and network-first for the API, an install prompt component, maskable icons (192/256/384/512), splash screen, and `apple-mobile-web-app-capable` meta tags. The app becomes installable on iOS, Android, and desktop, and the shell stays available offline.
 
-### FASE 6 — Multi-currency + Couples + OFX/CSV + OCR
+### FASE 6A — Multi-currency ✅ (shipped)
 
-Brings the app from a single-user / single-currency tool to a household-scale utility.
+See the dedicated [FASE 6A](#fase-6a--multi-currency-wise--nomad--c6-global--inter-global-) section above for the full write-up. Short version: sub-balances per currency on a single account + per-transaction FX snapshot + home-currency conversion everywhere + frankfurter.app-backed `FxRateService`.
 
-- **Multi-currency** — `accounts.currency` already exists, so FASE 6 adds FX conversion (rates cached daily, source: a free public endpoint), per-account balance in the user's home currency, and a per-transaction FX snapshot so historical reports stay correct after rate changes.
+### FASE 6B — Couples + OFX/CSV + OCR (planned)
+
+The rest of what was originally FASE 6.
+
 - **Couples mode** — `households` table + `household_users` pivot with `owner` / `member` roles. Shared accounts, shared goals, shared budgets, with private transactions (marked `is_private`) still hidden from the partner. Invitation flow via signed URL.
 - **OFX / CSV import** — bulk import of bank statements (OFX for fidelity, CSV with column mapping for flexibility). Auto-categorize using the FASE 5 AI, with a per-row review screen before commit. Deduplication by hash + amount + date.
 - **OCR (mock)** — "scan receipt" flow that lets the user upload a photo and pre-fills a transaction form. The mock uses deterministic fake data; the production version would wire Tesseract or a cloud OCR provider.
