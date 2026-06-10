@@ -4,34 +4,40 @@
 
 **Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
-## ✨ Status atual — FASE 3 entregue
+## ✨ Current status — FASE 4A delivered
 
-As fases **1**, **2** e **3** estão completas e mergeadas. Detalhes abaixo.
+Phases **1**, **2**, **3** and **4A** are complete and merged. The rest of phase 4 (subscriptions, PIX UI) plus phases 5–10 are pending.
 
 ### FASE 1 — Foundation ✅
-- 🔐 **Auth completo** — registro, login, logout, middleware
-- 🏠 **Dashboard** com 4 cards KPI (saldo total, receitas/despesas/economia do mês), lista de contas e transações recentes
-- 💳 **CRUD de Contas** (corrente, poupança, cartão, dinheiro, investimento, cripto) com saldo calculado em tempo real
-- 💸 **CRUD de Transações** (receitas, despesas, transferências) com filtros (busca, conta, categoria, tipo), paginação, flag PIX
-- 🏷️ **15 Categorias** pré-populadas (Alimentação, Transporte, Moradia, Saúde, Educação, etc) com ícones emoji e cores
-- 🌗 **Dark mode** com persistência em `localStorage` + tabela `users.theme`
-- ⌨️ **Atalhos de teclado** (`n` = nova transação, `g d` = dashboard, `g t` = transações, etc)
-- 📱 **Mobile-first** com bottom bar de navegação e FAB para nova transação
+- 🔐 **Full auth** — registration, login, logout, middleware
+- 🏠 **Dashboard** with 4 KPI cards (total balance, monthly inflow / outflow / savings), accounts list, recent transactions
+- 💳 **Accounts CRUD** (checking, savings, credit card, cash, investment, crypto) with real-time computed balance
+- 💸 **Transactions CRUD** (income, expense, transfer) with filters (search, account, category, type), pagination, PIX flag
+- 🏷️ **15 pre-populated Categories** (Alimentação, Transporte, Moradia, Saúde, Educação, etc) with emoji icons and colors
+- 🌗 **Dark mode** persisted in `localStorage` + `users.theme` table
+- ⌨️ **Keyboard shortcuts** (`n` = new transaction, `g d` = dashboard, `g t` = transactions, etc)
+- 📱 **Mobile-first** with bottom bar navigation and FAB for new transaction
 
-### FASE 2 — Orçamentos + Recorrências + Relatórios ✅
-- 🔄 **Recorrências** — geram transações futuras automaticamente (semanal, mensal, anual, personalizado)
-- 💰 **Orçamentos** por categoria, com barra de progresso e alerta visual ao atingir 80% / 100%
-- 📊 **Relatórios** com gráficos reais (ApexCharts): pizza por categoria, linha de fluxo 12 meses, despesas diárias, top merchants
-- 🧪 `ReportService` centraliza cálculos e cacheia por 5 min por usuário
+### FASE 2 — Budgets + Recurrences + Reports ✅
+- 🔄 **Recurrences** — auto-generate future transactions (weekly, monthly, yearly, custom)
+- 💰 **Budgets** per category with progress bar and visual alert at 80% / 100%
+- 📊 **Reports** with real charts (ApexCharts): category donut, 12-month flow line, daily spending, top merchants
+- 🧪 `ReportService` centralizes calculations and caches for 5 min per user
 
-### FASE 3 — Tags + Splits + Busca global + Filtros avançados ✅
-- 🏷️ **Tags** coloridas e com emoji para organizar transações (8 tags demo: Trabalho, Pessoal, Urgente, Família, Viagem, Casa, Investimento, Imposto)
-- ✂️ **Splits de transação** — dividir uma despesa igualmente, por percentual, ou por valor exato (ótimo pra roommates, casais, viagem)
-- 🔍 **Busca global** (pressione `/`) em transações, contas, tags
-- 🎯 **Filtros avançados** na lista de transações: período (este mês, últimos 3, personalizado), tipo, status (pago/pendente), conta, categoria, valor mín/máx
-- 🔒 API JSON `/api/tags` e `/api/search` com auth de sessão (não token)
+### FASE 3 — Tags + Splits + Global search + Advanced filters ✅
+- 🏷️ **Tags** colored and with emoji to organize transactions (8 demo tags: Trabalho, Pessoal, Urgente, Família, Viagem, Casa, Investimento, Imposto)
+- ✂️ **Transaction splits** — divide an expense equally, by percentage, or by exact amount (great for roommates, couples, trips)
+- 🔍 **Global search** (press `/`) across transactions, accounts, tags
+- 🎯 **Advanced filters** on the transactions list: period (this month, last 3, custom), type, status (paid / pending), account, category, min / max amount
+- 🔒 JSON API `/api/tags` and `/api/search` with session auth (not token)
 
-> ⚠️ **Bug conhecido:** o gráfico de "Fluxo de caixa" no dashboard exibe placeholder quando deveria renderizar ApexCharts (issue #5 — gráficos do `Dashboard.vue` ficaram de fora do último merge). A FASE 2 entregou os gráficos só na página `/reports`. Workaround: visite `/reports` para ver os gráficos.
+### FASE 4A — Savings goals ✅
+- 🎯 **Goals CRUD** with target amount, optional deadline, emoji icon, color
+- 💸 **Contribute / withdraw** actions (in cents) keep a running `current_amount_cents`
+- 🏆 **Auto-stamp** of `achieved_at` when current ≥ target
+- 🛟 **Soft archive** keeps history without deleting
+- 📊 **Dashboard widget** surfaces the top 3 in-progress goals (closest deadline first)
+- 🧮 14 feature tests covering CRUD, contribute / withdraw, validation, isolation, achieved stamping, and progress cap at 100%
 
 ## 🚀 Quick start
 
@@ -45,87 +51,91 @@ composer install
 # Frontend deps
 npm install
 
-# Banco SQLite + dados demo
+# SQLite database + demo data
 touch database/database.sqlite
 php artisan migrate:fresh --seed
 
-# Subir
+# Run
 php artisan serve --host 0.0.0.0 --port 8000
-./node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort   # em outro terminal
+npm run dev   # in another terminal
 ```
 
-Acesse `http://localhost:8000` e entre com:
+Open `http://localhost:8000` and sign in with:
 
 - **Email:** `demo@solar.app`
-- **Senha:** `solar123`
+- **Password:** `solar123`
 
-## 🧪 Testes
+## 🧪 Tests
 
 ```bash
 php artisan test
 ```
 
-Resultado atual:
+Current result:
+
 ```
-Tests:  69 passed (272 assertions)
-Duration: 1.71s
+Tests:  86 passed (367 assertions)
+Duration: 1.23s
 ```
 
-Cobertura:
-- Auth (registro, login, logout, middleware)
-- Contas (CRUD, saldo, isolamento, soft delete)
-- Transações (income, expense, transfer, soft delete, splits, filtros)
-- Recorrências (geração automática, soft delete, inativa não gera)
-- Orçamentos (cálculo, reset, isolamento por user)
-- Relatórios (12 meses, top categorias, top merchants, isolamento)
-- Tags (CRUD, slug auto, attach/detach, validação, isolamento)
-- Busca global (descrição, notas, valor, isolamento)
+Coverage by feature:
+
+- **Auth** — registration, login, logout, middleware
+- **Accounts** — CRUD, balance, isolation, soft delete
+- **Transactions** — income, expense, transfer, soft delete, splits, filters
+- **Recurrences** — auto-generation, soft delete, inactive does not generate
+- **Budgets** — calculation, reset, isolation by user
+- **Reports** — 12 months, top categories, top merchants, isolation
+- **Tags** — CRUD, auto slug, attach / detach, validation, isolation
+- **Search** — global search by description, notes, amount, isolation
+- **API auth** — `/api/*` uses session auth, not tokens
+- **Goals (FASE 4A)** — CRUD, contribute / withdraw, achieved stamping, progress cap, isolation
 
 ## 🏗️ Stack
 
-| Camada       | Tecnologia                              |
-|--------------|------------------------------------------|
-| Backend      | Laravel 13.13 · PHP 8.4 · SQLite (dev)   |
-| Auth         | Sessions + CSRF (built-in, sem Breeze)   |
-| Bridge       | Inertia.js 3.3 (sem API separada)        |
-| Frontend     | Vue 3.5 · Composition API                |
-| Estado       | Pinia 3                                  |
-| UI           | Tailwind 3.4 + tokens custom (solar)    |
-| Bundler      | Vite 8 (rolldown)                        |
-| Charts       | ApexCharts 5.13 + vue3-apexcharts        |
-| Validação    | FormRequest (backend) + useForm (frontend) |
-| Testes       | PHPUnit 11 (Pest ainda sem suporte Laravel 13) |
+| Layer        | Technology                                |
+|--------------|-------------------------------------------|
+| Backend      | Laravel 13.13 · PHP 8.4 · SQLite (dev)    |
+| Auth         | Sessions + CSRF (built-in, no Breeze)     |
+| Bridge       | Inertia.js 3.3 (no separate API)          |
+| Frontend     | Vue 3.5 · Composition API                 |
+| State        | Pinia 3                                   |
+| UI           | Tailwind 3.4 + custom solar tokens        |
+| Bundler      | Vite 8 (rolldown)                         |
+| Charts       | ApexCharts 5.13 + vue3-apexcharts         |
+| Validation   | FormRequest (backend) + useForm (frontend)|
+| Tests        | PHPUnit 12 (Pest not yet supported on Laravel 13) |
 
-## 🗂️ Estrutura
+## 🗂️ Structure
 
 ```
 app/
-  Models/         # User, Account, Category, Transaction, Recurrence, Budget, Tag, TransactionSplit
-  Services/       # ReportService (monthlyFlow, categoryBreakdown, kpis, ...)
+  Models/         # User, Account, Category, Transaction, Recurrence, Budget, Tag, TransactionSplit, Goal
+  Services/       # ReportService (monthlyFlow, categoryBreakdown, kpis, ...), RecurrenceService, TransactionFilterService, TransactionSplitService
   Http/
-    Controllers/  # Account*, Auth/*, Budget*, Dashboard*, Profile*, Recurrence*, Report*, Tag*, Transaction*
-    Requests/     # FormRequests por recurso (Store/Update)
-    Middleware/   # HandleInertiaRequests (compartilha auth.user)
+    Controllers/  # Account*, Auth/*, Budget*, Dashboard*, Goal*, Profile*, Recurrence*, Report*, Tag*, Transaction*
+    Requests/     # FormRequests per resource (Store / Update)
+    Middleware/   # HandleInertiaRequests (shares auth.user)
 database/
-  migrations/     # 16 migrations, soft deletes + índices
-  seeders/        # 1 user demo, 5 contas, 15 categorias, ~170 transações, 8 tags
+  migrations/     # 17 migrations, soft deletes + indexes
+  seeders/        # 1 demo user, 5 accounts, 15 categories, ~170 transactions, 8 tags, 3 goals
 resources/js/
   Pages/
     Auth/         # Login, Register
     Accounts/     # Index, Create, Edit
     Transactions/ # Index, Form, Show
-    Tags/         # Index (grid de cards)
+    Tags/         # Index (cards grid)
     Budgets/      # Index
     Recurrences/  # Index, Create, Edit
+    Goals/        # Index, Create, Edit (FASE 4A)
     Reports/      # Index (ApexCharts: line, donut, bar, horizontal)
-    Placeholders/ # Futuras seções
     Profile/      # Edit
-  Layouts/        # AuthenticatedLayout (sidebar + bottombar), GuestLayout
-  Composables/    # useFormat, useShortcuts, useChart (useLineConfig/useDonutConfig/useBarConfig), useTag, useTransactionFilters
+  Layouts/        # AuthenticatedLayout (sidebar + bottom bar), GuestLayout
+  Composables/    # useFormat, useShortcuts, useChart (useLineConfig / useDonutConfig / useBarConfig), useTag, useTransactionFilters, useGlobalSearch
   app.js          # createInertiaApp + Pinia + Ziggy + ApexCharts global
 ```
 
-## 💰 Modelo de dados — diagrama ER
+## 💰 Data model — ER diagram
 
 ```mermaid
 erDiagram
@@ -135,10 +145,11 @@ erDiagram
     USERS ||--o{ TAGS : owns
     USERS ||--o{ BUDGETS : owns
     USERS ||--o{ RECURRENCES : owns
+    USERS ||--o{ GOALS : owns
     ACCOUNTS ||--o{ TRANSACTIONS : "source (account_id)"
     ACCOUNTS ||--o{ TRANSACTIONS : "destination (destination_account_id)"
-    CATEGORIES ||--o{ TRANSACTIONS : "categorizes"
-    RECURRENCES ||--o{ TRANSACTIONS : "generates"
+    CATEGORIES ||--o{ TRANSACTIONS : categorizes
+    RECURRENCES ||--o{ TRANSACTIONS : generates
     TRANSACTIONS ||--o{ TRANSACTION_SPLITS : "split into"
     TRANSACTIONS }o--o{ TAGS : "tagged with"
 
@@ -173,7 +184,7 @@ erDiagram
         int destination_account_id FK
         int category_id FK
         string type "income|expense|transfer"
-        int amount_cents "signed: +entra, -sai"
+        int amount_cents "signed: +inflow, -outflow"
         date date
         string description
         bool is_pix
@@ -211,41 +222,58 @@ erDiagram
         date next_run_at
         bool active
     }
+    GOALS {
+        int id PK
+        int user_id FK
+        string name
+        int target_amount_cents
+        int current_amount_cents
+        date deadline "nullable"
+        string icon
+        string color
+        timestamp achieved_at "nullable"
+        timestamp archived_at "nullable"
+    }
 ```
 
-**Convenção monetária:** todos os valores são armazenados como `int` em centavos. Conversão para reais (divisão por 100) só acontece na camada de apresentação.
+**Money convention:** all amounts are stored as `int` cents. Conversion to BRL (division by 100) only happens in the presentation layer.
 
-**Convenção de sinal:**
-- `income` → `amount_cents > 0` (entra)
-- `expense` → `amount_cents < 0` (sai)
-- `transfer` → `amount_cents < 0` (sai da origem; destino recebe via `destinationTransactions`)
+**Sign convention:**
+
+- `income` → `amount_cents > 0` (inflow)
+- `expense` → `amount_cents < 0` (outflow)
+- `transfer` → `amount_cents < 0` (outflow from source; destination receives via `destinationTransactions`)
 
 ## 📐 UI/UX
 
-- **Mobile-first**: testado em 375px (iPhone SE) até 1920px
-- **Cores semânticas**: verde `income` (#16a34a), vermelho `expense` (#dc2626), amarelo `warn` (#ca8a04), azul `info` (#2563eb)
-- **Moeda formatada** sempre em pt-BR: `R$ 1.234,56` via `Intl.NumberFormat`
-- **Datas** em formato brasileiro: `26/06/2026`
-- **Dark mode** com classe `dark` no `<html>`, persistido em `localStorage` e tabela `users.theme`
-- **Bottom bar mobile** com 5 ícones + FAB central para nova transação
-- **Atalhos de teclado**: `n` (nova tx), `g d` (dashboard), `g t` (transações), `g a` (contas), `/` (busca global), `Esc` (fechar modais)
+- **Mobile-first** — tested from 375px (iPhone SE) up to 1920px
+- **Semantic colors** — green `income` (#16a34a), red `expense` (#dc2626), yellow `warn` (#ca8a04), blue `info` (#2563eb)
+- **Currency** formatted in pt-BR: `R$ 1.234,56` via `Intl.NumberFormat`
+- **Dates** in Brazilian format: `26/06/2026`
+- **Dark mode** with `dark` class on `<html>`, persisted in `localStorage` and `users.theme`
+- **Mobile bottom bar** with 5 icons + central FAB for new transaction
+- **Keyboard shortcuts** — `n` (new tx), `g d` (dashboard), `g t` (transactions), `g a` (accounts), `/` (global search), `Esc` (close modals)
 
 ## 🛣️ Roadmap
 
-| Fase | Status | Entrega |
-|------|--------|---------|
-| **FASE 1** | ✅ mergeada (#1) | Auth + Dashboard + CRUD contas/transações + seeders + 13 testes |
-| **FASE 2** | ✅ mergeada (#2) | Recorrências + Orçamentos + Relatórios ApexCharts |
-| **FASE 3** | ✅ mergeada (#3) | Tags + Splits + Busca global + Filtros avançados |
-| **FASE 3.1** | ✅ mergeada (#4) | Fix: API JSON usa sessão web, remove R$ duplicado |
-| **Issue #5** | 🐞 known bug | Gráfico "Fluxo de caixa" no dashboard mostra placeholder (workaround: /reports) |
-| FASE 4 | ⏸️ pausada | Importação CSV/OFX + Metas de economia + Multi-moeda (branches experimentais, ver `feat/fase-4*`) |
-| FASE 5 | ⏸️ futura | Investimentos + Dívidas + IA categorize + PWA |
-| FASE 6 | ⏸️ futura | Open Finance (Belvo mock) + OCR de cupons + Modo casal |
+| Phase | Status  | Deliverable                                                                              |
+|-------|---------|------------------------------------------------------------------------------------------|
+| 1     | ✅ done | Auth + Dashboard + Accounts / Transactions CRUD + seeders + tests                       |
+| 2     | ✅ done | Recurrences + Budgets + Reports (ApexCharts)                                            |
+| 3     | ✅ done | Tags + Splits + Global search + Advanced filters                                        |
+| 4A    | ✅ done | Savings goals with dashboard widget                                                     |
+| 4B    | ⏳ next | Tracked subscriptions (Netflix, Spotify, etc)                                           |
+| 4C    | ⏳ next | Dedicated PIX UI (history, copy / paste, mock BR Code)                                  |
+| 5     | ⏳ todo | Investments + Debts + AI categorize + PWA                                               |
+| 6     | ⏳ todo | Multi-currency + Couples mode + OFX / CSV import + OCR                                   |
+| 7     | ⏳ todo | Tri-lingual i18n (pt-BR, es, en) with 3 names per category / tag                         |
+| 8     | ⏳ todo | AI financial advisor (rule-based MVP + optional Groq integration)                        |
+| 9     | ⏳ todo | Crypto tracker (live price via CoinGecko, P&L)                                           |
+| 10    | ⏳ todo | Polish + E2E tests (Playwright) + Deploy                                                |
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-PRs são bem-vindos. Antes de abrir:
+PRs are welcome. Before opening one:
 
 ```bash
 composer install
@@ -253,14 +281,15 @@ npm install
 php artisan test
 ```
 
-Padrões do projeto:
-- PHP em inglês (nomes, comentários), UI em pt-BR
-- PHPDoc em todo método público de service/controller
-- Soft deletes em qualquer tabela com dados de usuário
-- Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`)
-- Branches: `feat/fase-N-funcionalidade`, PR contra `main`
-- Não mergeie o próprio PR — espere review
+Project conventions:
 
-## 📄 Licença
+- **Code in English** (names, comments, commit messages); user-facing UI strings stay in pt-BR (product default) and are designed to be replaced via i18n in phase 7
+- **PHPDoc** on every public method of services and controllers
+- **Soft deletes** on any table that holds user-generated data
+- **Conventional commits** (`feat:`, `fix:`, `chore:`, `docs:`)
+- **Branches** named `feat/fase-N-feature`, PR against `main`
+- **Don't merge your own PR** — wait for review
 
-MIT — veja [LICENSE](LICENSE).
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
