@@ -2,6 +2,8 @@
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents, formatDate } from '@/Composables/useFormat';
+import { useLineConfig, useDarkMode } from '@/Composables/useChart';
+import { computed } from 'vue';
 
 const props = defineProps({
     totalBalanceCents: Number,
@@ -10,7 +12,25 @@ const props = defineProps({
     monthSavingsCents: Number,
     recentTransactions: { type: Array, default: () => [] },
     accounts: { type: Array, default: () => [] },
+    monthlyFlow: { type: Array, default: () => [] },
 });
+
+const isDark = useDarkMode();
+
+// Cash-flow chart datasets (Receitas / Despesas / Saldo).
+const flowCategories = computed(() => props.monthlyFlow.map((m) => m.month));
+const flowSeries = computed(() => [
+    { name: 'Receitas', data: props.monthlyFlow.map((m) => m.income) },
+    { name: 'Despesas', data: props.monthlyFlow.map((m) => Math.abs(m.expense)) },
+    { name: 'Saldo',    data: props.monthlyFlow.map((m) => m.net) },
+]);
+const flowOptions = computed(() => useLineConfig({
+    categories: flowCategories.value,
+    series: flowSeries.value,
+    isDark,
+    height: 256,
+    colors: ['#10b981', '#ef4444', '#3b82f6'],
+}));
 </script>
 
 <template>
@@ -42,17 +62,21 @@ const props = defineProps({
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-            <!-- Charts placeholder -->
+            <!-- Cash-flow chart -->
             <div class="card p-5 lg:col-span-2">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="font-semibold">Fluxo de caixa</h2>
                     <span class="text-xs text-slate-400">Últimos 6 meses</span>
                 </div>
-                <div class="h-48 md:h-64 flex items-center justify-center text-slate-400 dark:text-slate-500">
-                    <div class="text-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                        <p class="text-sm">Gráficos chegam na FASE 2</p>
-                    </div>
+                <Apexchart
+                    v-if="props.monthlyFlow.length"
+                    type="line"
+                    height="256"
+                    :options="flowOptions"
+                    :series="flowSeries"
+                />
+                <div v-else class="h-64 flex items-center justify-center text-sm text-slate-400">
+                    Sem transações no período
                 </div>
             </div>
 

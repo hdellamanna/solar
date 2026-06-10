@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\Transaction;
+use App\Services\ReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,9 +13,22 @@ use Inertia\Response;
 
 /**
  * Renders the main dashboard with aggregated metrics and recent transactions.
+ *
+ * The cash-flow chart series (last 6 months) is computed via {@see ReportService::monthlyFlow()}
+ * so the same SQL aggregation powers both the dashboard and the Reports page.
  */
 class DashboardController extends Controller
 {
+    /**
+     * Number of months to chart in the dashboard "Fluxo de caixa" line.
+     * Smaller than the Reports page (12) because the dashboard card is compact.
+     */
+    private const FLOW_MONTHS = 6;
+
+    public function __construct(private readonly ReportService $reports)
+    {
+    }
+
     /**
      * Compute KPIs and return the dashboard view.
      */
@@ -69,6 +83,9 @@ class DashboardController extends Controller
             'balance_cents' => $a->balance_cents,
         ]);
 
+        // Cash-flow line chart series for the last N months.
+        $monthlyFlow = $this->reports->monthlyFlow($user, self::FLOW_MONTHS);
+
         return Inertia::render('Dashboard', [
             'totalBalanceCents' => $totalBalanceCents,
             'monthInflowCents' => $monthInflowCents,
@@ -77,6 +94,7 @@ class DashboardController extends Controller
             'recentTransactions' => $recentTransactions,
             'accounts' => $accountsData,
             'accountCount' => $accounts->count(),
+            'monthlyFlow' => $monthlyFlow,
         ]);
     }
 }
