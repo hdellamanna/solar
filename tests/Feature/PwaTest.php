@@ -108,8 +108,11 @@ class PwaTest extends TestCase
     {
         $source = $this->get(route('pwa.service-worker'))->getContent();
 
+        // Accept both forms: literal "solar-vN" OR template `solar-${...}`.
+        // The template form is what the SW uses (solar-${CACHE_VERSION}).
+        // Use raw string (#) delimiters so the $ and \ don't get mangled.
         $this->assertMatchesRegularExpression(
-            "/CACHE_NAME\\s*=\\s*[`'\"\\s]+solar-v\\d+/",
+            '#CACHE_NAME\s*=\s*(?:[`\'"\\s]+solar-v\d+|`solar-\$\{[^}]+\}`)#',
             $source,
             'Service worker must declare a solar-vN versioned cache name.',
         );

@@ -132,3 +132,29 @@ Route::get('/sw.js', function () {
         'Service-Worker-Allowed' => '/',
     ]);
 })->name('pwa.service-worker');
+
+/*
+| PWA assets: serve any file under public/pwa/ via the front controller.
+| This mirrors what Apache/Nginx do with a static-files location block
+| and keeps the test runner happy. Filenames are constrained to a
+| tight charset to avoid path-traversal accidents.
+*/
+Route::get('/pwa/{file}', function (string $file) {
+    abort_unless(preg_match('#^[A-Za-z0-9._\-]+$#', $file), 404);
+    $path = public_path('pwa/' . $file);
+    abort_unless(
+        file_exists($path) && str_starts_with(realpath($path), realpath(public_path('pwa'))),
+        404,
+    );
+    $mime = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+        'png' => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'svg' => 'image/svg+xml',
+        'webp' => 'image/webp',
+        default => 'application/octet-stream',
+    };
+    return response()->make(file_get_contents($path), 200, [
+        'Content-Type' => $mime,
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+    ]);
+})->where('file', '[A-Za-z0-9._\-]+')->name('pwa.assets');
