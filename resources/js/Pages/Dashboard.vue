@@ -213,6 +213,24 @@ const flowOptions = computed(() => useLineConfig({
                 </div>
                 <Link :href="route('debts.index')" class="text-xs text-brand-600 hover:underline">Ver todas</Link>
             </div>
+            <div v-if="props.debts.top && props.debts.top.length > 0" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link
+                    v-for="d in props.debts.top"
+                    :key="d.id"
+                    :href="route('debts.show', d.id)"
+                    class="flex items-center gap-3 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                >
+                    <div
+                        class="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 transition-transform duration-200 ease-out group-hover:scale-105"
+                        :style="{ backgroundColor: '#ef44441a', color: '#ef4444' }"
+                    >💳</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate">{{ d.creditor }}</p>
+                        <p class="text-xs text-slate-500 truncate">{{ d.description || 'Sem descrição' }}</p>
+                    </div>
+                    <p class="text-sm font-semibold tabular-nums">{{ formatCents(d.total_balance_cents) }}</p>
+                </Link>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6">

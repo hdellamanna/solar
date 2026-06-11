@@ -204,6 +204,21 @@ class DashboardController extends Controller
                 'count_active' => $activeDebts->count(),
                 'count_paid_off' => $paidOffDebts->count(),
                 'weighted_avg_rate' => $debtsWeightedAvgRate,
+                'top' => $activeDebts
+                    ->sortByDesc('total_balance_cents')
+                    ->take(5)
+                    ->map(fn (Debt $d) => [
+                        'id' => $d->id,
+                        'creditor' => $d->creditor,
+                        'description' => $d->description,
+                        'total_balance_cents' => (int) $d->total_balance_cents,
+                        'monthly_payment_cents' => (int) $d->monthly_payment_cents,
+                        'interest_rate_annual' => (float) $d->interest_rate_annual,
+                        'payoff_strategy' => $d->payoff_strategy,
+                        'is_paid_off' => (bool) $d->is_paid_off,
+                    ])
+                    ->values()
+                    ->all(),
             ],
         ]);
     }
