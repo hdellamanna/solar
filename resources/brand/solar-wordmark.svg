@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SOLAR — Wordmark
+  Companion to solar-mark.svg. Used in splash screens, store listings,
+  in-app headers, README, etc.
+
+  Layout: 12-ray sun mark on the left, "Solar" wordmark on the right.
+  Typography: Inter Bold, tightly tracked.
+  Background: soft off-white #FAFAF7.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" role="img" aria-label="Solar">
+  <title>Solar — Finanças pessoais</title>
+  <defs>
+    <linearGradient id="solarGradientWM" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="#FF8A3D"/>
+      <stop offset="100%" stop-color="#FFC93C"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="720" height="200" fill="#FAFAF7"/>
+
+  <g transform="translate(30 30) scale(0.273)">
+    <g transform="translate(256 256)">
+      <g transform="rotate(0)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(30)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(60)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(90)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(120)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(150)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(180)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(210)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(240)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(270)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(300)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <g transform="rotate(330)"><rect x="-16" y="-210" width="32" height="72" rx="16" ry="16" fill="url(#solarGradientWM)"/></g>
+      <circle cx="0" cy="0" r="96" fill="url(#solarGradientWM)"/>
+    </g>
+    <rect x="237" y="170" width="38" height="172" rx="19" ry="19" fill="#0F172A"/>
+    <circle cx="256" cy="170" r="10" fill="#0F172A"/>
+  </g>
+
+  <text x="180" y="128" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="96" font-weight="700" fill="#0F172A" letter-spacing="-2">Solar</text>
+</svg>

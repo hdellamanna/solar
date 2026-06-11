@@ -81,6 +81,9 @@ Route::middleware('auth')->group(function () {
     // PIX (FASE 4C) — dedicated PIX UI
     Route::get('/pix', [\App\Http\Controllers\PixController::class, 'index'])->name('pix.index');
 
+    // Investments (FASE 5) — tracked portfolio positions
+    Route::resource('investments', \App\Http\Controllers\InvestmentController::class);
+
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
@@ -92,4 +95,66 @@ Route::middleware('auth')->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    // FASE 5 — opt-in toggle for the AI category suggester.
+    Route::patch('/profile/ai-preference', [ProfileController::class, 'updateAiPreference'])
+        ->name('profile.ai-preference');
 });
+
+/*
+|--------------------------------------------------------------------------
+| PWA static assets (FASE 5)
+|--------------------------------------------------------------------------
+|
+| The manifest and the service worker live in /public but Laravel's
+| test runner does not auto-serve static files (it routes every request
+| through the kernel). We expose them through dedicated routes so:
+|   1. The PWA works in environments where the public dir is not
+|      served by the front controller (php artisan serve, shared
+|      hosting, containers, etc).
+|   2. Feature tests can hit them via route('pwa.manifest') and
+|      route('pwa.service-worker').
+*/
+Route::get('/manifest.json', function () {
+    $path = public_path('manifest.json');
+    abort_unless(file_exists($path), 404);
+    return response()->make(file_get_contents($path), 200, [
+        'Content-Type' => 'application/manifest+json',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+})->name('pwa.manifest');
+
+Route::get('/sw.js', function () {
+    $path = public_path('sw.js');
+    abort_unless(file_exists($path), 404);
+    return response()->make(file_get_contents($path), 200, [
+        'Content-Type' => 'application/javascript; charset=utf-8',
+        'Cache-Control' => 'no-cache, must-revalidate',
+        'Service-Worker-Allowed' => '/',
+    ]);
+})->name('pwa.service-worker');
+
+/*
+| PWA assets: serve any file under public/pwa/ via the front controller.
+| This mirrors what Apache/Nginx do with a static-files location block
+| and keeps the test runner happy. Filenames are constrained to a
+| tight charset to avoid path-traversal accidents.
+*/
+Route::get('/pwa/{file}', function (string $file) {
+    abort_unless(preg_match('#^[A-Za-z0-9._\-]+$#', $file), 404);
+    $path = public_path('pwa/' . $file);
+    abort_unless(
+        file_exists($path) && str_starts_with(realpath($path), realpath(public_path('pwa'))),
+        404,
+    );
+    $mime = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+        'png' => 'image/png',
+        'jpg', 'jpeg' => 'image/jpeg',
+        'svg' => 'image/svg+xml',
+        'webp' => 'image/webp',
+        default => 'application/octet-stream',
+    };
+    return response()->make(file_get_contents($path), 200, [
+        'Content-Type' => $mime,
+        'Cache-Control' => 'public, max-age=31536000, immutable',
+    ]);
+})->where('file', '[A-Za-z0-9._\-]+')->name('pwa.assets');
