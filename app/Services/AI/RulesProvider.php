@@ -121,8 +121,21 @@ class RulesProvider implements CategorySuggester
         $rules = KeywordRules::all();
         $keys  = array_keys($rules);
         usort($keys, fn (string $a, string $b) => strlen($b) <=> strlen($a));
+
+        // Tokenize the description into alphanumeric words (3+ chars) so
+        // we match whole words only. This prevents "oi" (a telecom carrier)
+        // from matching inside "coisas" or "conhece", "net" from matching
+        // inside "internet", and similar false-positives that pure substring
+        // matching produces.
+        $tokens = preg_split('/[^a-z0-9]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $tokens = array_filter($tokens, fn ($t) => strlen($t) >= 3);
+
         foreach ($keys as $keyword) {
-            if ($keyword === '' || !str_contains($normalized, $keyword)) continue;
+            if ($keyword === '') continue;
+            $matched = $this->isMultiWord($keyword)
+                ? str_contains($normalized, $keyword)   // multi-word: substring is fine
+                : in_array($keyword, $tokens, true);  // single-word: token equality
+            if (!$matched) continue;
             $confidence = $this->isMultiWord($keyword)
                 ? self::CONFIDENCE_MULTI_WORD
                 : self::CONFIDENCE_SINGLE_WORD;
