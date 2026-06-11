@@ -4,9 +4,9 @@
 
 **Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
-## ✨ Current status — FASE 6A delivered
+## ✨ Current status — FASE 5 delivered
 
-Phases **1**, **2**, **3**, **4A / 4B / 4C** and **6A** are complete and merged. Phases 5, 6B, 7, 8, 9, 10 are pending.
+Phases **1**, **2**, **3**, **4A / 4B / 4C**, **6A** and **5** are complete and merged. Phases 6B, 7, 8, 9, 10 are pending.
 
 ### FASE 1 — Foundation ✅
 - 🔐 **Full auth** — registration, login, logout, middleware
@@ -100,8 +100,8 @@ php artisan test
 Current result:
 
 ```
-Tests:  120 passed (532 assertions)
-Duration: 1.47s
+Tests:  212 passed (1918 assertions)
+Duration: 1.7s
 ```
 
 Coverage by feature:
@@ -118,6 +118,12 @@ Coverage by feature:
 - **Goals (FASE 4A)** — CRUD, contribute / withdraw, achieved stamping, progress cap, isolation
 - **Subscriptions (FASE 4B)** — CRUD, pause / reactivate, billing-day roll-over, validation, isolation, dashboard widget
 - **PIX (FASE 4C)** — isolation, top-keys grouping, saved-keys, month totals
+- **Multi-currency (FASE 6A)** — sub-balances CRUD, isolation, FxRateService cache + dates + failure modes
+- **Investments (FASE 5)** — CRUD, P&L accessors, isolation, validation, dashboard widget
+- **Debts (FASE 5)** — CRUD, scopes, isolation, simulator, weighted-avg rate, dashboard widget
+- **AI categorize (FASE 5)** — RulesProvider keyword matching, accent-insensitive, cache, rate-limit, isolation, profile toggle, multi-word regression tests
+- **AmortizationService (FASE 5)** — SAC constant principal, Price constant payment, zero-interest, insufficient payment flag, float drift, 600-month cap
+- **PWA (FASE 5)** — manifest fields, icons HTTP 200, SW content type, versioned cache, network-only API, SKIP_WAITING message, PWA meta tags
 - **Multi-currency (FASE 6A)** — sub-balances CRUD, isolation, FxRateService cache + dates + failure modes
 
 ## 🏗️ Stack
@@ -146,8 +152,8 @@ app/
     Requests/     # FormRequests per resource (Store / Update)
     Middleware/   # HandleInertiaRequests (shares auth.user)
 database/
-  migrations/     # 22 migrations, soft deletes + indexes (FASE 6A adds account_balances, users.home_currency, transactions.currency + exchange_rate)
-  seeders/        # 1 demo user, 6 accounts (incl. Wise multi-currency), 15 categories, ~155 transactions, 8 tags, 3 goals, 4 subscriptions, 3 saved PIX keys, 2 sub-balances
+  migrations/     # 25 migrations, soft deletes + indexes (FASE 5 adds investments, debts, account_balances ai_categorize + ai_suggestion_cache, FASE 6A adds account_balances + users.home_currency + transactions.currency + exchange_rate)
+  seeders/        # 1 demo user, 6 accounts (incl. Wise multi-currency), 15 categories, ~144 transactions, 8 tags, 3 goals, 4 subscriptions, 3 saved PIX keys, 2 sub-balances, 3 investments, 2 debts (1 active, 1 paid off)
 resources/js/
   Pages/
     Auth/         # Login, Register
@@ -324,7 +330,7 @@ erDiagram
 | 4A    | ✅ done | Savings goals with dashboard widget                                                     |
 | 4B    | ✅ done | Tracked subscriptions with dashboard widget (Apple-style UI)                             |
 | 4C    | ✅ done | Dedicated PIX UI with saved keys and mock BR Code generator                              |
-| 5     | ⏳ todo | [Investments](#fase-5--investments--dívidas--ia-categorize--pwa)                         |
+| 5     | ✅ done | Investments + Debts (with SAC/Price simulator) + AI categorize + full PWA                |
 | 6A    | ✅ done | Multi-currency accounts (Wise / Nomad / C6 Global / Inter Global) with FX snapshot         |
 | 6B    | ⏳ todo | Couples mode + OFX / CSV import + OCR                                                     |
 | 7     | ⏳ todo | [Tri-lingual i18n](#fase-7--i18n-tri-língue)                                              |
@@ -332,14 +338,18 @@ erDiagram
 | 9     | ⏳ todo | [Crypto tracker](#fase-9--crypto)                                                         |
 | 10    | ⏳ todo | [Polish + E2E + Tauri installer](#fase-10--polish--e2e--tauri-installer)                  |
 
-### FASE 5 — Investments + Debts + AI categorize + PWA
+### FASE 5 — Investments + Debts + AI categorize + PWA ✅
 
-The biggest stretch so far, with four independent features sharing a single milestone.
+The biggest stretch so far — four independent features shipped in a single milestone.
 
-- **Investments** — `Investments` model with type (stock / fund / crypto / fixed-income / treasury), ticker, quantity, average price, current value (manual at first, with the door open for live quotes). CRUD + dashboard widget with allocation by class and total portfolio value. P&L computed from average price × current price.
-- **Debts** — `Debts` model with creditor, total balance, interest rate, monthly payment, start date, payoff strategy. CRUD + dashboard widget with total debt + monthly commitment. Built-in **SAC vs Price amortization simulator** that produces a month-by-month schedule showing how each strategy pays off the debt over time.
-- **AI categorize** — opt-in `users.use_ai_categorize` flag (off by default for privacy). When the user types a transaction description, a "✨ Sugerir com IA" button calls `POST /api/ai/suggest-category`, which prefers **Groq's `llama-3.3-70b-versatile`** (the key is already configured in `.env`) and falls back to a built-in **keyword-based RulesProvider** that recognizes 100+ pt-BR merchants across all 8 default categories. Results are cached for 30 days per user. The rules provider works fully offline — the LLM is an upgrade, not a requirement.
-- **PWA** — `manifest.json`, service worker with cache-first strategy for static assets and network-first for the API, an install prompt component, maskable icons (192/256/384/512), splash screen, and `apple-mobile-web-app-capable` meta tags. The app becomes installable on iOS, Android, and desktop, and the shell stays available offline.
+- 📈 **Investments** — `Investments` model with type (`stock / fund / crypto / fixed_income / treasury`), ticker, quantity, average price, current value, and currency. CRUD + dashboard widget showing total invested, current value, P&L, and per-class breakdown. P&L computed as `quantity × (current_price - average_price)`. Door open for live price quotes in FASE 9.
+- 💳 **Debts** — `Debts` model with creditor, total balance, interest rate, monthly payment, start date, and payoff strategy (`sac` / `price`). CRUD + dashboard widget with total balance, monthly commitment, and weighted-average interest rate. Built-in **SAC vs Price amortization simulator** that produces a month-by-month schedule showing how each strategy pays off the debt over time, with full math in cents and a cap of 600 months.
+- 🤖 **AI categorize** — opt-in `users.use_ai_categorize` flag (off by default for privacy). When the user types a transaction description, a "✨ Sugerir com IA" button calls `POST /api/ai/suggest-category`. The shipped driver is a **keyword-based RulesProvider** with 100+ pt-BR merchants across all default categories, with proper word-boundary matching to avoid false positives. Results are cached for 30 days per user, rate-limited at 30/hour, and never call out to a third party. The architecture leaves a clean `GroqSuggester` slot for FASE 8 — same `CategorySuggester` contract, just flip `AI_DRIVER=groq` and add a key.
+- 📱 **PWA** — full PWA: `manifest.json` with shortcuts to `/transactions/create` and `/dashboard`, a versioned service worker (`solar-v1`) with cache-first for static assets, network-first for HTML navigations, and **network-only for `/api/*` / `/sanctum/*` / `/broadcasting/*` / `/livewire/*`** (financial data never goes stale), 11 PNG assets (4 app icons, 2 favicons, apple-touch-icon, 3 iOS splashes, 1 store screenshot), and a dismissible "Instalar Solar" install banner. Installable on iOS, Android, and desktop. Brand mark: a 12-ray sun + ascending growth bar (the "SOLAR × MONEY" mark), with the SVG master committed at `resources/brand/solar-mark.svg` for future re-rendering.
+
+#### Lesson learned — case-sensitive paths
+
+The directory was originally committed as `app/Services/Ai/` (lowercase i) on macOS APFS, which is case-insensitive by default. The namespace inside the files was `App\Services\AI` (uppercase AI). That works on Mac and on Windows, but **GitHub Actions runs on Linux (ext4), which is case-sensitive — and there, `Ai` and `AI` are different paths**, so the PSR-4 autoloader failed. Renamed the directory to `app/Services/AI/` to match the namespace. CI is now green for everyone regardless of dev OS.
 
 ### FASE 6A — Multi-currency ✅ (shipped)
 
