@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents, formatDate } from '@/Composables/useFormat';
 import { useLineConfig, useDarkMode } from '@/Composables/useChart';
+import PwaInstallBanner from '@/Components/PwaInstallBanner.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -15,6 +16,7 @@ const props = defineProps({
     monthlyFlow: { type: Array, default: () => [] },
     goals: { type: Array, default: () => [] },
     subscriptions: { type: Object, default: () => ({}) },
+    investmentsSummary: { type: Object, default: () => null },
 });
 
 const isDark = useDarkMode();
@@ -201,5 +203,8 @@ const flowOptions = computed(() => useLineConfig({
                 </li>
             </ul>
         </div>
+
+        <!-- PWA install prompt — non-blocking, dismissible for 30 days -->
+        <PwaInstallBanner />
     </AuthenticatedLayout>
 </template>

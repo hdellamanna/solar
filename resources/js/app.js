@@ -8,6 +8,13 @@ import { ZiggyVue } from 'ziggy-js';
 import { route } from 'ziggy-js';
 import VueApexCharts from 'vue3-apexcharts';
 
+// PWA service worker — registered only in production builds. The module
+// self-checks `import.meta.env.PROD` and short-circuits in dev, so the
+// import is safe to keep unconditional at the entry point.
+if (import.meta.env && import.meta.env.PROD) {
+    import('./sw-register.js');
+}
+
 const appName = 'Solar';
 
 createInertiaApp({
