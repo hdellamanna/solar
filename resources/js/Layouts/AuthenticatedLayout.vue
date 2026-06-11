@@ -100,27 +100,28 @@ const totalResults = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-body">
-        <!-- Decorative ambient gradient — sits behind everything -->
+    <div class="min-h-screen bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-body mesh-canvas">
+        <!-- Decorative ambient mesh — sits behind everything, drifts slowly -->
         <div class="fixed inset-0 -z-10 pointer-events-none">
-            <div class="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
-                 style="background: radial-gradient(circle, rgba(255, 138, 61, 0.5), transparent 70%);"></div>
-            <div class="absolute top-1/3 -left-40 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+            <div class="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full opacity-40 blur-3xl animate-mesh-drift-a"
+                 style="background: radial-gradient(circle, rgba(255, 138, 61, 0.55), transparent 70%);"></div>
+            <div class="absolute top-1/3 -left-40 w-[600px] h-[600px] rounded-full opacity-30 blur-3xl animate-mesh-drift-b"
                  style="background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 70%);"></div>
+            <div class="absolute bottom-0 right-1/3 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl animate-mesh-drift-a"
+                 style="animation-delay: -12s; background: radial-gradient(circle, rgba(255, 201, 60, 0.5), transparent 70%);"></div>
         </div>
 
         <!-- ─── Desktop sidebar (visible md+) ─── -->
         <aside class="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-64
-                      bg-white/70 dark:bg-ink-900/70 backdrop-blur-2xl
-                      border-r border-ink-200/60 dark:border-ink-800/60
+                      glass !rounded-none border-r border-white/40 dark:border-white/5
                       z-30">
             <!-- Brand -->
-            <div class="px-5 h-16 flex items-center border-b border-ink-200/60 dark:border-ink-800/60">
-                <Link href="/" class="flex items-center gap-2.5 group">
+            <div class="px-5 h-16 flex items-center border-b border-ink-200/40 dark:border-white/5">
+                <Link href="/" class="flex items-center gap-2.5 group sun-wrap relative">
                     <div class="relative w-9 h-9 rounded-xl bg-gradient-to-br from-solar-500 to-solar-600
                                 grid place-items-center shadow-glow-solar
-                                transition-transform duration-300 group-hover:scale-105">
-                        <svg viewBox="0 0 32 32" class="w-5 h-5" aria-hidden="true">
+                                transition-transform duration-500 ease-spring group-hover:scale-110 group-hover:rotate-12">
+                        <svg viewBox="0 0 32 32" class="w-5 h-5 animate-sun-rotate" aria-hidden="true" style="animation-duration: 24s;">
                             <g transform="translate(16 16)">
                                 <g v-for="i in 8" :key="i" :transform="`rotate(${i * 45})`">
                                     <rect x="-1.2" y="-12" width="2.4" height="4.5" rx="1.2" fill="white" />
@@ -129,9 +130,10 @@ const totalResults = () => {
                                 <rect x="-0.6" y="-3.5" width="1.2" height="7" rx="0.6" fill="#0b0f1a" />
                             </g>
                         </svg>
+                        <div class="sun-lens"></div>
                     </div>
                     <div class="leading-tight">
-                        <div class="font-display font-extrabold text-base tracking-tight">Solar</div>
+                        <div class="font-display font-extrabold text-base tracking-tight text-gradient-aurora">Solar</div>
                         <div class="font-display text-[10px] uppercase tracking-[0.18em] text-ink-400">Money</div>
                     </div>
                 </Link>
@@ -201,18 +203,17 @@ const totalResults = () => {
         <Transition
             enter-active-class="transition duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
             leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="sidebarOpen" class="md:hidden fixed inset-0 z-40 bg-ink-950/40 backdrop-blur-sm" @click="sidebarOpen = false"></div>
+            <div v-if="sidebarOpen" class="md:hidden fixed inset-0 z-40 bg-ink-950/30 backdrop-blur-md" @click="sidebarOpen = false"></div>
         </Transition>
         <Transition
-            enter-active-class="transition duration-300 transform" enter-from-class="-translate-x-full" enter-to-class="translate-x-0"
-            leave-active-class="transition duration-200 transform" leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
+            enter-active-class="transition-all duration-500 ease-spring" enter-from-class="-translate-x-full opacity-0" enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition duration-200" leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
             <aside v-if="sidebarOpen"
-                   class="md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-ink-900
-                          border-r border-ink-200 dark:border-ink-800 flex flex-col">
-                <div class="flex items-center justify-between px-5 h-16 border-b border-ink-200 dark:border-ink-800">
+                   class="md:hidden fixed inset-y-0 left-0 z-50 w-72 glass !rounded-none flex flex-col">
+                <div class="flex items-center justify-between px-5 h-16 border-b border-ink-200/40 dark:border-white/5">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-solar-500 to-solar-600 grid place-items-center shadow-glow-solar">
-                            <svg viewBox="0 0 32 32" class="w-5 h-5" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" class="w-5 h-5 animate-sun-rotate" style="animation-duration: 24s;" aria-hidden="true">
                                 <g transform="translate(16 16)">
                                     <g v-for="i in 8" :key="i" :transform="`rotate(${i * 45})`">
                                         <rect x="-1.2" y="-12" width="2.4" height="4.5" rx="1.2" fill="white" />
@@ -221,9 +222,9 @@ const totalResults = () => {
                                 </g>
                             </svg>
                         </div>
-                        <span class="font-display font-extrabold text-base">Solar Money</span>
+                        <span class="font-display font-extrabold text-base text-gradient-aurora">Solar Money</span>
                     </div>
-                    <button @click="sidebarOpen = false" class="p-1 cursor-pointer">
+                    <button @click="sidebarOpen = false" class="p-1 cursor-pointer text-ink-600 dark:text-ink-300">
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -246,9 +247,8 @@ const totalResults = () => {
 
         <!-- ─── Main content area ─── -->
         <div class="md:pl-64 flex flex-col min-h-screen">
-            <!-- Top bar — glass -->
-            <header class="sticky top-0 z-20 bg-white/70 dark:bg-ink-950/70 backdrop-blur-2xl
-                           border-b border-ink-200/40 dark:border-ink-800/40">
+            <!-- Top bar — liquid glass -->
+            <header class="sticky top-0 z-20 glass !rounded-none border-b border-white/30 dark:border-white/5">
                 <div class="flex items-center justify-between gap-3 h-16 px-4 md:px-6">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
                         <button @click="sidebarOpen = true"
@@ -362,10 +362,9 @@ const totalResults = () => {
                 <slot />
             </main>
 
-            <!-- Mobile bottom bar -->
+            <!-- Mobile bottom bar — liquid glass -->
             <nav class="md:hidden fixed bottom-0 inset-x-0 z-30
-                         bg-white/80 dark:bg-ink-950/80 backdrop-blur-2xl
-                         border-t border-ink-200/60 dark:border-ink-800/60">
+                         glass !rounded-none border-t border-white/30 dark:border-white/5">
                 <div class="grid grid-cols-5 h-16 relative">
                     <Link :href="route('dashboard')"
                           :class="['flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium',
@@ -385,8 +384,8 @@ const totalResults = () => {
                     </Link>
                     <Link :href="route('transactions.create')"
                           class="flex flex-col items-center justify-center -mt-5">
-                        <span class="w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-primary-700
-                                     text-white grid place-items-center shadow-glow-violet
+                        <span class="w-14 h-14 rounded-full btn-primary !p-0
+                                     text-white grid place-items-center
                                      border-4 border-white dark:border-ink-950
                                      transition-transform active:scale-95">
                             <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

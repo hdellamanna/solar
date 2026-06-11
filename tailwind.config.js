@@ -81,10 +81,13 @@ export default {
         'sun-rotate': 'sun-rotate 60s linear infinite',
         'sun-pulse': 'sun-pulse 4s ease-in-out infinite',
         'gradient-shift': 'gradient-shift 8s ease infinite',
-        'fade-up': 'fade-up 0.4s ease-out forwards',
+        'fade-up': 'fade-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
         'fade-in': 'fade-in 0.3s ease-out forwards',
         'sparkline-draw': 'sparkline-draw 1.2s ease-out forwards',
         'shimmer': 'shimmer 2.4s linear infinite',
+        'mesh-drift-a': 'mesh-drift-a 24s ease-in-out infinite',
+        'mesh-drift-b': 'mesh-drift-b 32s ease-in-out infinite',
+        'liquid-spring-in': 'liquid-spring-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
       },
       keyframes: {
         'sun-rotate': {
@@ -115,6 +118,24 @@ export default {
           '0%': { 'background-position': '-200% 0' },
           '100%': { 'background-position': '200% 0' },
         },
+        'mesh-drift-a': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '33%     ': { transform: 'translate(2%, -1%) scale(1.05)' },
+          '66%     ': { transform: 'translate(-2%, 1%) scale(0.97)' },
+        },
+        'mesh-drift-b': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
+          '50%     ': { transform: 'translate(3%, 2%) scale(1.1) rotate(5deg)' },
+        },
+        'liquid-spring-in': {
+          '0%':   { opacity: '0', transform: 'translateY(20px) scale(0.96)' },
+          '60%':  { opacity: '1' },
+          '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+        },
+      },
+      transitionTimingFunction: {
+        'spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        'glass': 'cubic-bezier(0.25, 0.1, 0.25, 1)',
       },
       boxShadow: {
         // Premium shadows — soft, layered, never harsh

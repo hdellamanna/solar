@@ -23,7 +23,7 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
                         v-model="form.email"
                         type="email"
                         placeholder="voce@email.com"
-                        class="input"
+                        class="input-glass"
                         required
                         autofocus
                     >
@@ -38,7 +38,7 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
                         v-model="form.password"
                         type="password"
                         placeholder="••••••••"
-                        class="input"
+                        class="input-glass"
                         required
                     >
                 </div>
@@ -81,9 +81,9 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
             </p>
 
             <!-- Demo creds hint -->
-            <div class="mt-6 p-3 rounded-xl bg-primary-50 dark:bg-primary-500/10
-                        border border-primary-100 dark:border-primary-500/20 text-xs text-ink-600 dark:text-ink-300">
-                <span class="font-semibold">Demo:</span> demo@solar.app · solar123
+            <div class="mt-6 p-3.5 rounded-2xl text-xs text-ink-600 dark:text-ink-300
+                        card-glass">
+                <span class="font-semibold text-primary-600 dark:text-primary-400">Demo:</span> demo@solar.app · solar123
             </div>
         </div>
     </GuestLayout>

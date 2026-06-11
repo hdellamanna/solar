@@ -61,9 +61,9 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
     <Head title="Dashboard · Solar Money" />
     <AuthenticatedLayout title="Dashboard">
 
-        <!-- ─── HERO — Saldo total com gradiente + sparkline ─── -->
-        <section class="surface-ink p-6 md:p-8 mb-6">
-            <div class="absolute top-4 right-4 chip-ink text-white/60 border-white/10">
+        <!-- ─── HERO — Saldo total com gradiente + sparkline + glass refraction ─── -->
+        <section class="surface-ink p-6 md:p-8 mb-6 sun-wrap">
+            <div class="absolute top-4 right-4 chip-ink text-white/60 border-white/10 z-10">
                 {{ homeCurrency }}
             </div>
 
@@ -79,29 +79,31 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                     este mês · em {{ accounts.length }} {{ accounts.length === 1 ? 'conta' : 'contas' }}
                 </p>
 
-                <!-- In-hero cashflow sparkline -->
+                <!-- In-hero cashflow sparkline with glow on hover -->
                 <div class="mt-6 pt-5 border-t border-white/10">
                     <div class="flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-white/50 mb-2">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-sun-pulse"></span>
                         <span>Fluxo · últimos 6 meses</span>
                     </div>
-                    <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="w-full h-8">
-                        <defs>
-                            <linearGradient id="heroSpark" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stop-color="#FF8A3D" stop-opacity="0.5" />
-                                <stop offset="100%" stop-color="#FF8A3D" stop-opacity="0" />
-                            </linearGradient>
-                        </defs>
-                        <path :d="`${sparkNet} L100,30 L0,30 Z`" fill="url(#heroSpark)" />
-                        <path :d="sparkNet" fill="none" stroke="#FFC93C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
+                    <div class="sparkline-wrap" style="color: #FFC93C;">
+                        <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="w-full h-8 sparkline-glow">
+                            <defs>
+                                <linearGradient id="heroSpark" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#FF8A3D" stop-opacity="0.5" />
+                                    <stop offset="100%" stop-color="#FF8A3D" stop-opacity="0" />
+                                </linearGradient>
+                            </defs>
+                            <path :d="`${sparkNet} L100,30 L0,30 Z`" fill="url(#heroSpark)" />
+                            <path :d="sparkNet" fill="none" stroke="#FFC93C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- ─── Quick stats — 3 mini cards com sparklines ─── -->
+        <!-- ─── Quick stats — 3 liquid-glass tiles com sparklines ─── -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
-            <div class="stat-tile">
+            <div class="glass stat-tile-glass glass-sweep">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Receitas do mês</p>
@@ -115,12 +117,14 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                         </svg>
                     </div>
                 </div>
-                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2">
-                    <path :d="sparkInflow" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <div class="sparkline-wrap" style="color: #10b981;">
+                    <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2 sparkline-glow">
+                        <path :d="sparkInflow" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
             </div>
 
-            <div class="stat-tile">
+            <div class="glass stat-tile-glass glass-sweep">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Despesas do mês</p>
@@ -134,12 +138,14 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                         </svg>
                     </div>
                 </div>
-                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2">
-                    <path :d="sparkOutflow" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <div class="sparkline-wrap" style="color: #ef4444;">
+                    <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2 sparkline-glow">
+                        <path :d="sparkOutflow" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
             </div>
 
-            <div class="stat-tile">
+            <div class="glass stat-tile-glass glass-sweep">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Economia do mês</p>
@@ -154,15 +160,17 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                         </svg>
                     </div>
                 </div>
-                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2">
-                    <path :d="sparkNet" fill="none" :stroke="monthSavingsCents >= 0 ? '#7c3aed' : '#ef4444'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
+                <div class="sparkline-wrap" :style="`color: ${monthSavingsCents >= 0 ? '#7c3aed' : '#ef4444'};`">
+                    <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="w-full h-4 mt-2 sparkline-glow">
+                        <path :d="sparkNet" fill="none" :stroke="monthSavingsCents >= 0 ? '#7c3aed' : '#ef4444'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
             </div>
         </div>
 
         <!-- ─── Two-column: cash flow chart + goals ─── -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-            <div class="card p-5 md:p-6 lg:col-span-2">
+            <div class="card-elevated glass-sweep p-5 md:p-6 lg:col-span-2">
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <h2 class="font-display font-bold text-lg">Fluxo de caixa</h2>
@@ -183,7 +191,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                 </div>
             </div>
 
-            <div class="card p-5">
+            <div class="card-elevated glass-sweep p-5">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="font-display font-bold text-base">Metas em andamento</h2>
                     <Link :href="route('goals.index')" class="text-xs text-primary-600 hover:underline">Ver todas</Link>
@@ -203,7 +211,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                             <span class="text-xs font-bold text-ink-700 dark:text-ink-200 tabular-nums num">{{ g.progress_percent }}%</span>
                         </div>
                         <div class="h-1.5 rounded-full bg-ink-100 dark:bg-ink-800 overflow-hidden">
-                            <div class="h-full rounded-full transition-all"
+                            <div class="h-full rounded-full transition-all duration-700 ease-spring"
                                  :style="{ width: g.progress_percent + '%', backgroundColor: g.color || '#f59e0b' }"></div>
                         </div>
                         <p class="text-[11px] text-ink-500 mt-1.5 ml-9 num">
@@ -215,7 +223,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
         </div>
 
         <!-- ─── Subscriptions (FASE 4B) ─── -->
-        <div v-if="(subscriptions?.active_count ?? 0) > 0" class="card-elevated p-5 md:p-6 mt-4 md:mt-6">
+        <div v-if="(subscriptions?.active_count ?? 0) > 0" class="card-elevated glass-sweep p-5 md:p-6 mt-4 md:mt-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="font-display font-bold text-base">Assinaturas</h2>
@@ -289,7 +297,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
         </div>
 
         <!-- ─── Debts (FASE 5) ─── -->
-        <div v-if="(debts?.count_active ?? 0) > 0" class="card-elevated p-5 md:p-6 mt-4 md:mt-6">
+        <div v-if="(debts?.count_active ?? 0) > 0" class="card-elevated glass-sweep p-5 md:p-6 mt-4 md:mt-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h2 class="font-display font-bold text-base">Dívidas</h2>
@@ -321,7 +329,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
 
         <!-- ─── Two-column: accounts + recent transactions ─── -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-4 md:mt-6">
-            <div class="card p-5 lg:col-span-1">
+            <div class="card-elevated glass-sweep p-5 lg:col-span-1">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="font-display font-bold text-base">Minhas contas</h2>
                     <Link :href="route('accounts.create')" class="text-xs text-primary-600 hover:underline">+ Nova</Link>
@@ -343,7 +351,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                 </ul>
             </div>
 
-            <div class="card p-5 lg:col-span-2">
+            <div class="card-elevated glass-sweep p-5 lg:col-span-2">
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="font-display font-bold text-base">Transações recentes</h2>
                     <Link :href="route('transactions.index')" class="text-xs text-primary-600 hover:underline">Ver todas</Link>
