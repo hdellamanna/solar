@@ -155,7 +155,7 @@ class PwaTest extends TestCase
         $this->assertStringContainsString('rel="manifest"', $html);
         $this->assertStringContainsString('href="/manifest.json"', $html);
         $this->assertStringContainsString('theme-color', $html);
-        $this->assertStringContainsString('#FF8A3D', $html);
+        $this->assertStringContainsString('#0b0f1a', $html);
         $this->assertStringContainsString('apple-touch-icon', $html);
         $this->assertStringContainsString('apple-mobile-web-app-capable', $html);
     }

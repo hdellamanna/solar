@@ -27,10 +27,8 @@ const focusSearch = () => {
     nextTick(() => searchInput.value?.focus());
 };
 const blurSearch = () => {
-    // Slight delay so click-on-result can fire first.
     setTimeout(() => { searchOpen.value = false; }, 120);
 };
-
 const onSearchKeydown = (e) => {
     if (e.key === 'Escape') {
         e.preventDefault();
@@ -44,12 +42,7 @@ const onSearchKeydown = (e) => {
         }
     }
 };
-
-const goTo = (href) => {
-    searchOpen.value = false;
-    router.visit(href);
-};
-
+const goTo = (href) => { searchOpen.value = false; router.visit(href); };
 const onDocClick = (e) => {
     if (!searchWrapper.value) return;
     if (!searchWrapper.value.contains(e.target)) {
@@ -68,23 +61,30 @@ onMounted(() => {
     });
     document.addEventListener('mousedown', onDocClick);
 });
-onUnmounted(() => {
-    document.removeEventListener('mousedown', onDocClick);
-});
+onUnmounted(() => document.removeEventListener('mousedown', onDocClick));
 
+// ─── Nav with Lucide-style icons (24x24, 1.6 stroke for premium feel) ───
 const nav = [
-    { name: 'Dashboard', route: 'dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { name: 'Transações', route: 'transactions.index', icon: 'M3 10h18M3 6h18M3 14h18M3 18h18' },
-    { name: 'Contas', route: 'accounts.index', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
-    { name: 'Recorrências', route: 'recurrences.index', icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' },
-    { name: 'Tags', route: 'tags.index', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
-    { name: 'Orçamentos', route: 'budgets.index', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-    { name: 'Metas', route: 'goals.index', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
-    { name: 'Assinaturas', route: 'subscriptions.index', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-    { name: 'Investimentos', route: 'investments.index', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
-    { name: 'Dívidas', route: 'debts.index', icon: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    { name: 'PIX', route: 'pix.index', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-    { name: 'Relatórios', route: 'reports.index', icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    { section: 'PRINCIPAL', items: [
+        { name: 'Dashboard',     route: 'dashboard',         icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
+        { name: 'Transações',    route: 'transactions.index', icon: 'M4 6h16M4 12h16M4 18h12' },
+        { name: 'Contas',        route: 'accounts.index',    icon: 'M3 8h18v4H3V8zm0 6h18v2H3v-2zm0-12h18v2H3V2z' },
+    ]},
+    { section: 'PLANEJAMENTO', items: [
+        { name: 'Metas',         route: 'goals.index',         icon: 'M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21z' },
+        { name: 'Orçamentos',    route: 'budgets.index',       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+        { name: 'Assinaturas',   route: 'subscriptions.index', icon: 'M4 4h16v4H4V4zm0 6h16v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6zm4 4h8' },
+    ]},
+    { section: 'PATRIMÔNIO', items: [
+        { name: 'Investimentos', route: 'investments.index', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
+        { name: 'Dívidas',       route: 'debts.index',        icon: 'M12 8c-1.7 0-3 1.3-3 3s1.3 3 3 3 3 1.3 3 3-1.3 3-3 3M3 12a9 9 0 1018 0 9 9 0 00-18 0z' },
+        { name: 'Recorrências',  route: 'recurrences.index',  icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2' },
+    ]},
+    { section: 'PAGAR & ANALISAR', items: [
+        { name: 'PIX',           route: 'pix.index',         icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+        { name: 'Tags',          route: 'tags.index',        icon: 'M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
+        { name: 'Relatórios',    route: 'reports.index',     icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+    ]},
 ];
 
 const isActive = (routeName) => {
@@ -92,9 +92,7 @@ const isActive = (routeName) => {
     const path = route(routeName);
     return page.url.startsWith(path);
 };
-
 const logout = () => router.post(route('logout'));
-
 const totalResults = () => {
     const r = searchResults.value;
     return r.accounts.length + r.categories.length + r.transactions.length + r.tags.length;
@@ -102,152 +100,232 @@ const totalResults = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-        <!-- Sidebar desktop -->
-        <aside class="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
-            <div class="flex items-center gap-2 px-6 h-16 border-b border-slate-200 dark:border-slate-800">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-                <span class="text-xl font-bold">Solar</span>
-            </div>
-            <nav class="flex-1 p-3 space-y-1">
-                <Link v-for="item in nav" :key="item.name" :href="route(item.route)" :class="['flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors', isActive(item.route) ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800']">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-                    </svg>
-                    {{ item.name }}
-                </Link>
-            </nav>
-            <div class="p-3 border-t border-slate-200 dark:border-slate-800">
-                <div class="flex items-center gap-3 px-3 py-2">
-                    <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-semibold text-sm">
-                        {{ initials(user?.name) }}
+    <div class="min-h-screen bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-body">
+        <!-- Decorative ambient gradient — sits behind everything -->
+        <div class="fixed inset-0 -z-10 pointer-events-none">
+            <div class="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
+                 style="background: radial-gradient(circle, rgba(255, 138, 61, 0.5), transparent 70%);"></div>
+            <div class="absolute top-1/3 -left-40 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+                 style="background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 70%);"></div>
+        </div>
+
+        <!-- ─── Desktop sidebar (visible md+) ─── -->
+        <aside class="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:w-64
+                      bg-white/70 dark:bg-ink-900/70 backdrop-blur-2xl
+                      border-r border-ink-200/60 dark:border-ink-800/60
+                      z-30">
+            <!-- Brand -->
+            <div class="px-5 h-16 flex items-center border-b border-ink-200/60 dark:border-ink-800/60">
+                <Link href="/" class="flex items-center gap-2.5 group">
+                    <div class="relative w-9 h-9 rounded-xl bg-gradient-to-br from-solar-500 to-solar-600
+                                grid place-items-center shadow-glow-solar
+                                transition-transform duration-300 group-hover:scale-105">
+                        <svg viewBox="0 0 32 32" class="w-5 h-5" aria-hidden="true">
+                            <g transform="translate(16 16)">
+                                <g v-for="i in 8" :key="i" :transform="`rotate(${i * 45})`">
+                                    <rect x="-1.2" y="-12" width="2.4" height="4.5" rx="1.2" fill="white" />
+                                </g>
+                                <circle cx="0" cy="0" r="5.5" fill="white" />
+                                <rect x="-0.6" y="-3.5" width="1.2" height="7" rx="0.6" fill="#0b0f1a" />
+                            </g>
+                        </svg>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium truncate">{{ user?.name }}</p>
-                        <p class="text-xs text-slate-500 truncate">{{ user?.email }}</p>
+                    <div class="leading-tight">
+                        <div class="font-display font-extrabold text-base tracking-tight">Solar</div>
+                        <div class="font-display text-[10px] uppercase tracking-[0.18em] text-ink-400">Money</div>
+                    </div>
+                </Link>
+            </div>
+
+            <!-- Nav -->
+            <nav class="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+                <div v-for="group in nav" :key="group.section">
+                    <div class="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-400 dark:text-ink-500">
+                        {{ group.section }}
+                    </div>
+                    <div class="space-y-0.5">
+                        <Link
+                            v-for="item in group.items" :key="item.name"
+                            :href="route(item.route)"
+                            :class="[
+                                'nav-item group',
+                                isActive(item.route) ? 'nav-item-active' : ''
+                            ]"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-[18px] h-[18px] shrink-0"
+                                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+                                <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+                            </svg>
+                            <span class="truncate">{{ item.name }}</span>
+                            <span v-if="isActive(item.route)" class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-500"></span>
+                        </Link>
                     </div>
                 </div>
+            </nav>
+
+            <!-- User card at bottom -->
+            <div class="p-3 border-t border-ink-200/60 dark:border-ink-800/60">
+                <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-ink-100/60 dark:hover:bg-ink-800/60 transition-colors group">
+                    <div class="relative w-10 h-10 rounded-full
+                                bg-gradient-to-br from-primary-500 to-primary-700
+                                grid place-items-center text-white font-display font-bold text-sm
+                                shadow-soft">
+                        {{ initials(user?.name) }}
+                        <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full
+                                     bg-emerald-500 border-2 border-white dark:border-ink-900"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold truncate">{{ user?.name }}</p>
+                        <p class="text-[11px] text-ink-500 dark:text-ink-400 truncate">{{ user?.email }}</p>
+                    </div>
+                    <button @click="userMenuOpen = !userMenuOpen"
+                            class="p-1 rounded text-ink-400 hover:text-ink-700 dark:hover:text-ink-200
+                                   transition-colors cursor-pointer">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
+                        </svg>
+                    </button>
+                </div>
+                <Transition
+                    enter-active-class="transition duration-150" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
+                    leave-active-class="transition duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
+                    <div v-if="userMenuOpen" class="mt-1.5 card p-1 text-sm">
+                        <Link :href="route('profile.edit')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">Perfil</Link>
+                        <button @click="logout" class="block w-full text-left px-3 py-2 rounded-lg text-expense hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">Sair</button>
+                    </div>
+                </Transition>
             </div>
         </aside>
 
-        <!-- Sidebar mobile (drawer) -->
+        <!-- ─── Mobile sidebar (drawer) ─── -->
         <Transition
             enter-active-class="transition duration-200" enter-from-class="opacity-0" enter-to-class="opacity-100"
             leave-active-class="transition duration-200" leave-from-class="opacity-100" leave-to-class="opacity-0">
-            <div v-if="sidebarOpen" class="md:hidden fixed inset-0 z-40 bg-slate-900/50" @click="sidebarOpen = false"></div>
+            <div v-if="sidebarOpen" class="md:hidden fixed inset-0 z-40 bg-ink-950/40 backdrop-blur-sm" @click="sidebarOpen = false"></div>
         </Transition>
         <Transition
-            enter-active-class="transition duration-200 transform" enter-from-class="-translate-x-full" enter-to-class="translate-x-0"
+            enter-active-class="transition duration-300 transform" enter-from-class="-translate-x-full" enter-to-class="translate-x-0"
             leave-active-class="transition duration-200 transform" leave-from-class="translate-x-0" leave-to-class="-translate-x-full">
-            <aside v-if="sidebarOpen" class="md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
-                <div class="flex items-center justify-between px-6 h-16 border-b border-slate-200 dark:border-slate-800">
-                    <span class="text-xl font-bold">Solar</span>
-                    <button @click="sidebarOpen = false" class="p-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <aside v-if="sidebarOpen"
+                   class="md:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white dark:bg-ink-900
+                          border-r border-ink-200 dark:border-ink-800 flex flex-col">
+                <div class="flex items-center justify-between px-5 h-16 border-b border-ink-200 dark:border-ink-800">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-solar-500 to-solar-600 grid place-items-center shadow-glow-solar">
+                            <svg viewBox="0 0 32 32" class="w-5 h-5" aria-hidden="true">
+                                <g transform="translate(16 16)">
+                                    <g v-for="i in 8" :key="i" :transform="`rotate(${i * 45})`">
+                                        <rect x="-1.2" y="-12" width="2.4" height="4.5" rx="1.2" fill="white" />
+                                    </g>
+                                    <circle cx="0" cy="0" r="5.5" fill="white" />
+                                </g>
+                            </svg>
+                        </div>
+                        <span class="font-display font-extrabold text-base">Solar Money</span>
+                    </div>
+                    <button @click="sidebarOpen = false" class="p-1 cursor-pointer">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-                <nav class="flex-1 p-3 space-y-1">
-                    <Link v-for="item in nav" :key="item.name" :href="route(item.route)" @click="sidebarOpen = false" :class="['flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium', isActive(item.route) ? 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800']">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-                        </svg>
-                        {{ item.name }}
-                    </Link>
+                <nav class="flex-1 p-3 space-y-5 overflow-y-auto">
+                    <div v-for="group in nav" :key="group.section">
+                        <div class="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-400">{{ group.section }}</div>
+                        <Link v-for="item in group.items" :key="item.name" :href="route(item.route)" @click="sidebarOpen = false"
+                              :class="['nav-item', isActive(item.route) ? 'nav-item-active' : '']">
+                            <svg class="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                                <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+                            </svg>
+                            {{ item.name }}
+                        </Link>
+                    </div>
                 </nav>
             </aside>
         </Transition>
 
-        <!-- Main content area -->
+        <!-- ─── Main content area ─── -->
         <div class="md:pl-64 flex flex-col min-h-screen">
-            <!-- Top bar -->
-            <header class="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+            <!-- Top bar — glass -->
+            <header class="sticky top-0 z-20 bg-white/70 dark:bg-ink-950/70 backdrop-blur-2xl
+                           border-b border-ink-200/40 dark:border-ink-800/40">
                 <div class="flex items-center justify-between gap-3 h-16 px-4 md:px-6">
                     <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <button @click="sidebarOpen = true" class="md:hidden p-1 -ml-1 text-slate-600 dark:text-slate-300">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <button @click="sidebarOpen = true"
+                                class="md:hidden p-1.5 -ml-1 text-ink-600 dark:text-ink-300 cursor-pointer">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
-                        <h1 class="text-lg font-semibold hidden sm:block">{{ title }}</h1>
+                        <h1 class="font-display text-lg font-bold hidden sm:block truncate">{{ title }}</h1>
 
-                        <!-- Global search -->
                         <div ref="searchWrapper" class="relative flex-1 max-w-md">
                             <div class="relative">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
                                 </svg>
-                                <input
-                                    ref="searchInput"
-                                    v-model="searchQuery"
-                                    @focus="searchOpen = true"
-                                    @keydown="onSearchKeydown"
-                                    type="text"
-                                    placeholder="Buscar... (pressione /)"
-                                    class="w-full pl-9 pr-16 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 border border-transparent focus:border-brand-500 focus:bg-white dark:focus:bg-slate-900 focus:outline-none transition-colors"
-                                />
-                                <kbd class="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5 text-xs font-mono text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded">/</kbd>
+                                <input ref="searchInput" v-model="searchQuery"
+                                       @focus="searchOpen = true" @keydown="onSearchKeydown"
+                                       type="text" placeholder="Buscar... (pressione /)"
+                                       class="w-full pl-9 pr-16 py-2 text-sm rounded-xl
+                                              bg-ink-100/60 dark:bg-ink-800/60
+                                              border border-transparent
+                                              focus:border-primary-500 focus:bg-white dark:focus:bg-ink-900
+                                              focus:ring-2 focus:ring-primary-500/20
+                                              outline-none transition-all" />
+                                <kbd class="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 px-1.5 py-0.5
+                                           text-[10px] font-mono text-ink-500 bg-white dark:bg-ink-900
+                                           border border-ink-200 dark:border-ink-700 rounded">/</kbd>
                             </div>
 
-                            <!-- Dropdown -->
                             <Transition
                                 enter-active-class="transition duration-150" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
                                 leave-active-class="transition duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-                                <div v-if="searchOpen && searchQuery.trim().length >= 2" class="absolute left-0 right-0 mt-2 card p-0 max-h-[70vh] overflow-y-auto z-50">
-                                    <div v-if="searchLoading" class="p-4 text-sm text-slate-500 text-center">Buscando...</div>
-                                    <div v-else-if="!searchHasResults()" class="p-6 text-sm text-slate-500 text-center">
+                                <div v-if="searchOpen && searchQuery.trim().length >= 2"
+                                     class="absolute left-0 right-0 mt-2 card p-0 max-h-[70vh] overflow-y-auto z-50">
+                                    <div v-if="searchLoading" class="p-4 text-sm text-ink-500 text-center">Buscando...</div>
+                                    <div v-else-if="!searchHasResults()" class="p-6 text-sm text-ink-500 text-center">
                                         Nenhum resultado para "<strong>{{ searchQuery }}</strong>"
                                     </div>
                                     <div v-else>
-                                        <!-- Accounts -->
-                                        <div v-if="searchResults.accounts.length" class="border-b border-slate-100 dark:border-slate-800">
-                                            <div class="px-3 py-1.5 text-xs font-semibold uppercase text-slate-400 bg-slate-50 dark:bg-slate-800/50">Contas</div>
-                                            <button v-for="a in searchResults.accounts" :key="'acc-' + a.id" @click="goTo(route('accounts.index', { search: a.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <div v-if="searchResults.accounts.length" class="border-b border-ink-100 dark:border-ink-800">
+                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Contas</div>
+                                            <button v-for="a in searchResults.accounts" :key="'acc-' + a.id" @click="goTo(route('accounts.index', { search: a.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: a.color || '#94a3b8' }"></span>
                                                 <span class="text-sm font-medium flex-1 truncate">{{ a.name }}</span>
-                                                <span class="text-xs text-slate-400">{{ a.type }}</span>
+                                                <span class="text-xs text-ink-400">{{ a.type }}</span>
                                             </button>
                                         </div>
-
-                                        <!-- Categories -->
-                                        <div v-if="searchResults.categories.length" class="border-b border-slate-100 dark:border-slate-800">
-                                            <div class="px-3 py-1.5 text-xs font-semibold uppercase text-slate-400 bg-slate-50 dark:bg-slate-800/50">Categorias</div>
-                                            <button v-for="c in searchResults.categories" :key="'cat-' + c.id" @click="goTo(route('transactions.index', { category_ids: [c.id] }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <div v-if="searchResults.categories.length" class="border-b border-ink-100 dark:border-ink-800">
+                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Categorias</div>
+                                            <button v-for="c in searchResults.categories" :key="'cat-' + c.id" @click="goTo(route('transactions.index', { category_ids: [c.id] }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="text-base">{{ c.icon || '📦' }}</span>
                                                 <span class="text-sm font-medium flex-1 truncate">{{ c.name }}</span>
-                                                <span class="text-xs text-slate-400">{{ c.type === 'income' ? 'Receita' : 'Despesa' }}</span>
+                                                <span class="text-xs text-ink-400">{{ c.type === 'income' ? 'Receita' : 'Despesa' }}</span>
                                             </button>
                                         </div>
-
-                                        <!-- Tags -->
-                                        <div v-if="searchResults.tags.length" class="border-b border-slate-100 dark:border-slate-800">
-                                            <div class="px-3 py-1.5 text-xs font-semibold uppercase text-slate-400 bg-slate-50 dark:bg-slate-800/50">Tags</div>
-                                            <button v-for="t in searchResults.tags" :key="'tag-' + t.id" @click="goTo(route('transactions.index', { search: t.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <div v-if="searchResults.tags.length" class="border-b border-ink-100 dark:border-ink-800">
+                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Tags</div>
+                                            <button v-for="t in searchResults.tags" :key="'tag-' + t.id" @click="goTo(route('transactions.index', { search: t.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: t.color || '#94a3b8' }"></span>
                                                 <span class="text-sm font-medium">#{{ t.name }}</span>
                                             </button>
                                         </div>
-
-                                        <!-- Transactions -->
                                         <div v-if="searchResults.transactions.length">
-                                            <div class="px-3 py-1.5 text-xs font-semibold uppercase text-slate-400 bg-slate-50 dark:bg-slate-800/50">Transações</div>
-                                            <button v-for="t in searchResults.transactions" :key="'tx-' + t.id" @click="goTo(route('transactions.edit', t.id))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Transações</div>
+                                            <button v-for="t in searchResults.transactions" :key="'tx-' + t.id" @click="goTo(route('transactions.edit', t.id))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :class="t.type === 'income' ? 'bg-emerald-500' : (t.type === 'transfer' ? 'bg-blue-500' : 'bg-rose-500')"></span>
                                                 <div class="flex-1 min-w-0">
                                                     <p class="text-sm font-medium truncate">{{ t.description }}</p>
-                                                    <p class="text-xs text-slate-400 truncate">{{ formatDate(t.date) }} · {{ t.account?.name }}</p>
+                                                    <p class="text-xs text-ink-400 truncate">{{ formatDate(t.date) }} · {{ t.account?.name }}</p>
                                                 </div>
                                                 <span class="text-sm font-semibold tabular-nums" :class="t.type === 'income' ? 'text-income' : 'text-expense'">
                                                     {{ t.type === 'income' ? '+' : '-' }}{{ formatCents(Math.abs(t.amount_cents)) }}
                                                 </span>
                                             </button>
                                         </div>
-
-                                        <div class="border-t border-slate-100 dark:border-slate-800 p-2 text-center">
-                                            <button @click="goTo(route('transactions.index', { search: searchQuery }))" class="text-xs text-brand-600 hover:underline">
+                                        <div class="border-t border-ink-100 dark:border-ink-800 p-2 text-center">
+                                            <button @click="goTo(route('transactions.index', { search: searchQuery }))" class="text-xs text-primary-600 hover:underline">
                                                 Ver todos ({{ totalResults() }}) em Transações →
                                             </button>
                                         </div>
@@ -256,52 +334,80 @@ const totalResults = () => {
                             </Transition>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <button @click="toggleTheme" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" :title="isDark ? 'Modo claro' : 'Modo escuro'">
-                            <svg v-if="isDark" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                            <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+
+                    <div class="flex items-center gap-1.5">
+                        <button @click="toggleTheme"
+                                class="p-2 rounded-xl hover:bg-ink-100 dark:hover:bg-ink-800/60
+                                       text-ink-600 dark:text-ink-300 transition-colors cursor-pointer"
+                                :title="isDark ? 'Modo claro' : 'Modo escuro'">
+                            <svg v-if="isDark" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <circle cx="12" cy="12" r="4" />
+                                <path stroke-linecap="round" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                            </svg>
+                            <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+                            </svg>
                         </button>
-                        <div class="relative">
-                            <button @click="userMenuOpen = !userMenuOpen" class="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white font-semibold text-xs">
-                                    {{ initials(user?.name) }}
-                                </div>
-                            </button>
-                            <div v-if="userMenuOpen" @click="userMenuOpen = false" class="absolute right-0 mt-1 w-48 card p-1 z-50">
-                                <Link :href="route('profile.edit')" class="block px-3 py-2 text-sm rounded hover:bg-slate-100 dark:hover:bg-slate-800">Perfil</Link>
-                                <button @click="logout" class="block w-full text-left px-3 py-2 text-sm rounded text-expense hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
-                            </div>
-                        </div>
+                        <Link :href="route('transactions.create')" class="btn-primary hidden sm:inline-flex text-xs">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Nova transação
+                        </Link>
                     </div>
                 </div>
             </header>
 
-            <main class="flex-1 p-4 md:p-6 pb-24 md:pb-6">
+            <main class="flex-1 px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto">
                 <slot />
             </main>
 
-            <!-- Bottom bar mobile -->
-            <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-                <div class="grid grid-cols-5 h-16">
-                    <Link :href="route('dashboard')" :class="['flex flex-col items-center justify-center gap-1 text-xs', isActive('dashboard') ? 'text-brand-600' : 'text-slate-500']">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+            <!-- Mobile bottom bar -->
+            <nav class="md:hidden fixed bottom-0 inset-x-0 z-30
+                         bg-white/80 dark:bg-ink-950/80 backdrop-blur-2xl
+                         border-t border-ink-200/60 dark:border-ink-800/60">
+                <div class="grid grid-cols-5 h-16 relative">
+                    <Link :href="route('dashboard')"
+                          :class="['flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium',
+                                   isActive('dashboard') ? 'text-primary-600 dark:text-primary-400' : 'text-ink-400']">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
+                        </svg>
                         Início
                     </Link>
-                    <Link :href="route('transactions.index')" :class="['flex flex-col items-center justify-center gap-1 text-xs', isActive('transactions.index') ? 'text-brand-600' : 'text-slate-500']">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18M3 18h18M3 6h18" /></svg>
+                    <Link :href="route('transactions.index')"
+                          :class="['flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium',
+                                   isActive('transactions.index') ? 'text-primary-600 dark:text-primary-400' : 'text-ink-400']">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h12" />
+                        </svg>
                         Trans.
                     </Link>
-                    <Link :href="route('transactions.create')" class="flex flex-col items-center justify-center -mt-6">
-                        <span class="w-12 h-12 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-white flex items-center justify-center shadow-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    <Link :href="route('transactions.create')"
+                          class="flex flex-col items-center justify-center -mt-5">
+                        <span class="w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-primary-700
+                                     text-white grid place-items-center shadow-glow-violet
+                                     border-4 border-white dark:border-ink-950
+                                     transition-transform active:scale-95">
+                            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
                         </span>
                     </Link>
-                    <Link :href="route('budgets.index')" :class="['flex flex-col items-center justify-center gap-1 text-xs', isActive('budgets.index') ? 'text-brand-600' : 'text-slate-500']">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2" /></svg>
-                        Orçam.
+                    <Link :href="route('investments.index')"
+                          :class="['flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium',
+                                   isActive('investments.index') ? 'text-primary-600 dark:text-primary-400' : 'text-ink-400']">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                        Invest.
                     </Link>
-                    <Link :href="route('accounts.index')" :class="['flex flex-col items-center justify-center gap-1 text-xs', isActive('accounts.index') ? 'text-brand-600' : 'text-slate-500']">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                    <Link :href="route('accounts.index')"
+                          :class="['flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium',
+                                   isActive('accounts.index') ? 'text-primary-600 dark:text-primary-400' : 'text-ink-400']">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8h18v4H3V8zm0 6h18v2H3v-2z" />
+                        </svg>
                         Mais
                     </Link>
                 </div>
