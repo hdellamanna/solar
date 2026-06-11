@@ -74,6 +74,22 @@ class User extends Authenticatable
     }
 
     /**
+     * Investment positions owned by this user.
+     */
+    public function investments(): HasMany
+    {
+        return $this->hasMany(Investment::class);
+    }
+
+    /**
+     * Debts owned by this user.
+     */
+    public function debts(): HasMany
+    {
+        return $this->hasMany(Debt::class);
+    }
+
+    /**
      * Initials used for the avatar in the top bar.
      */
     public function initials(): string

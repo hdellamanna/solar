@@ -17,6 +17,7 @@ const props = defineProps({
     goals: { type: Array, default: () => [] },
     subscriptions: { type: Object, default: () => ({}) },
     investmentsSummary: { type: Object, default: () => null },
+    debts: { type: Object, default: () => ({}) },
 });
 
 const isDark = useDarkMode();
@@ -152,6 +153,65 @@ const flowOptions = computed(() => useLineConfig({
                     </div>
                     <p class="text-sm font-semibold tabular-nums">{{ s.amount_formatted }}</p>
                 </Link>
+            </div>
+        </div>
+
+        <!-- Investments widget (FASE 5) -->
+        <div v-if="props.investmentsSummary" class="card-elevated p-5 md:p-6 mt-4 md:mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-semibold tracking-tight">Investimentos</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        {{ props.investmentsSummary.count }} posição{{ props.investmentsSummary.count === 1 ? '' : 'es' }} · valor atual {{ formatCents(props.investmentsSummary.current_value_cents) }}
+                    </p>
+                </div>
+                <Link :href="route('investments.index')" class="text-xs text-brand-600 hover:underline">Ver todos</Link>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <p class="text-xs text-slate-500">Total investido</p>
+                    <p class="text-base font-semibold tabular-nums mt-0.5">{{ formatCents(props.investmentsSummary.total_invested_cents) }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <p class="text-xs text-slate-500">Valor atual</p>
+                    <p class="text-base font-semibold tabular-nums mt-0.5">{{ formatCents(props.investmentsSummary.current_value_cents) }}</p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+                    <p class="text-xs text-slate-500">P&amp;L</p>
+                    <p
+                        class="text-base font-semibold tabular-nums mt-0.5"
+                        :class="props.investmentsSummary.profit_loss_cents >= 0 ? 'text-emerald-600' : 'text-rose-600'"
+                    >
+                        {{ props.investmentsSummary.profit_loss_cents >= 0 ? '+' : '' }}{{ formatCents(props.investmentsSummary.profit_loss_cents) }}
+                        <span v-if="props.investmentsSummary.profit_loss_percent !== null" class="text-xs ml-1">
+                            ({{ props.investmentsSummary.profit_loss_percent >= 0 ? '+' : '' }}{{ props.investmentsSummary.profit_loss_percent.toFixed(2) }}%)
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div v-if="props.investmentsSummary.by_type.length > 0" class="flex flex-wrap gap-2">
+                <span
+                    v-for="t in props.investmentsSummary.by_type"
+                    :key="t.type"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    :style="{ backgroundColor: (t.color || '#64748b') + '1a', color: t.color || '#64748b' }"
+                >
+                    {{ t.label }} · {{ formatCents(t.total_cents) }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Debts widget (FASE 5) -->
+        <div v-if="(props.debts?.count_active ?? 0) > 0" class="card-elevated p-5 md:p-6 mt-4 md:mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="font-semibold tracking-tight">Dívidas</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        {{ formatCents(props.debts.total_balance_cents) }} em {{ props.debts.count_active }} dívida{{ props.debts.count_active === 1 ? '' : 's' }} ativa{{ props.debts.count_active === 1 ? '' : 's' }}
+                        · {{ formatCents(props.debts.monthly_commitment_cents) }} / mês
+                    </p>
+                </div>
+                <Link :href="route('debts.index')" class="text-xs text-brand-600 hover:underline">Ver todas</Link>
             </div>
         </div>
 

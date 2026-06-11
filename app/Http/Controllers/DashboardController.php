@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\AccountBalance;
+use App\Models\Debt;
 use App\Models\Goal;
+use App\Models\Investment;
 use App\Models\Subscription;
 use App\Models\Transaction;
 use App\Services\FxRateService;
@@ -137,6 +139,41 @@ class DashboardController extends Controller
             ])
             ->values();
 
+        // FASE 5 — Investments summary
+        $investments = $user->investments()->get();
+        $investmentsTotalCents = (int) $investments->sum(fn (Investment $i) => $i->total_invested_cents);
+        $investmentsCurrentCents = (int) $investments->sum(fn (Investment $i) => $i->current_value_cents);
+        $investmentsPlCents = $investmentsCurrentCents - $investmentsTotalCents;
+        $investmentsPlPercent = $investmentsTotalCents > 0
+            ? round(($investmentsPlCents / $investmentsTotalCents) * 100, 2)
+            : null;
+        $investmentsByType = $investments
+            ->groupBy('type')
+            ->map(fn ($group, $type) => [
+                'type' => $type,
+                'label' => $group->first()->type_label ?? ucfirst($type),
+                'color' => $group->first()->type_color ?? 'slate',
+                'total_cents' => (int) $group->sum(fn (Investment $i) => $i->total_invested_cents),
+            ])
+            ->values()
+            ->all();
+
+        // FASE 5 — Debts summary
+        $activeDebts = Debt::where('user_id', $user->id)->active()->get();
+        $paidOffDebts = Debt::where('user_id', $user->id)->paidOff()->get();
+        $debtsTotalCents = (int) $activeDebts->sum('total_balance_cents');
+        $debtsMonthlyCents = (int) $activeDebts->sum('monthly_payment_cents');
+        $debtsWeightedAvgRate = null;
+        if ($activeDebts->isNotEmpty()) {
+            $totalBalance = (float) $activeDebts->sum('total_balance_cents');
+            if ($totalBalance > 0) {
+                $weighted = (float) $activeDebts->sum(
+                    fn (Debt $d) => (float) $d->total_balance_cents * (float) $d->interest_rate_annual
+                );
+                $debtsWeightedAvgRate = round($weighted / $totalBalance, 4);
+            }
+        }
+
         return Inertia::render('Dashboard', [
             'homeCurrency' => $home,
             'totalBalanceCents' => $totalBalanceCents,
@@ -152,6 +189,21 @@ class DashboardController extends Controller
                 'total_monthly_cents' => $subscriptionsTotalMonthlyCents,
                 'active_count' => $activeSubs->count(),
                 'upcoming' => $upcomingSubscriptions,
+            ],
+            'investmentsSummary' => $investments->isEmpty() ? null : [
+                'count' => $investments->count(),
+                'total_invested_cents' => $investmentsTotalCents,
+                'current_value_cents' => $investmentsCurrentCents,
+                'profit_loss_cents' => $investmentsPlCents,
+                'profit_loss_percent' => $investmentsPlPercent,
+                'by_type' => $investmentsByType,
+            ],
+            'debts' => [
+                'total_balance_cents' => $debtsTotalCents,
+                'monthly_commitment_cents' => $debtsMonthlyCents,
+                'count_active' => $activeDebts->count(),
+                'count_paid_off' => $paidOffDebts->count(),
+                'weighted_avg_rate' => $debtsWeightedAvgRate,
             ],
         ]);
     }

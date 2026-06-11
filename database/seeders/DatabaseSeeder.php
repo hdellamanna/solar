@@ -5,7 +5,9 @@ namespace Database\Seeders;
 use App\Models\Account;
 use App\Models\AccountBalance;
 use App\Models\Category;
+use App\Models\Debt;
 use App\Models\Goal;
+use App\Models\Investment;
 use App\Models\PixKey;
 use App\Models\Recurrence;
 use App\Models\Subscription;
@@ -44,6 +46,8 @@ class DatabaseSeeder extends Seeder
         $this->seedGoals($user);
         $this->seedSubscriptions($user, $accounts);
         $this->seedPixKeys($user);
+        $this->seedInvestments($user);
+        $this->seedDebts($user);
     }
 
     /**
@@ -385,6 +389,99 @@ class DatabaseSeeder extends Seeder
 
         foreach ($keys as $k) {
             PixKey::create(array_merge(['user_id' => $user->id], $k));
+        }
+    }
+
+    /**
+     * Seed 3 demo investments (FASE 5) for the demo user.
+     */
+    private function seedInvestments(User $user): void
+    {
+        if (Investment::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $defs = [
+            [
+                'name' => 'Itaúsa (ITSA4)',
+                'type' => 'stock',
+                'ticker' => 'ITSA4',
+                'quantity' => 100,
+                'average_price_cents' => 1050,
+                'current_price_cents' => 1120,
+                'currency' => 'BRL',
+                'notes' => 'Long-term hold',
+                'acquired_at' => now()->subYears(2)->toDateString(),
+            ],
+            [
+                'name' => 'Bitcoin',
+                'type' => 'crypto',
+                'ticker' => 'BTC',
+                'quantity' => 0.05,
+                'average_price_cents' => 35000000,
+                'current_price_cents' => 38000000,
+                'currency' => 'BRL',
+                'notes' => 'Cold wallet',
+                'acquired_at' => now()->subYear()->toDateString(),
+            ],
+            [
+                'name' => 'Tesouro Selic 2029',
+                'type' => 'treasury',
+                'ticker' => 'LFT',
+                'quantity' => 1,
+                'average_price_cents' => 100000,
+                'current_price_cents' => 105000,
+                'currency' => 'BRL',
+                'notes' => null,
+                'acquired_at' => now()->subMonths(6)->toDateString(),
+            ],
+        ];
+
+        foreach ($defs as $d) {
+            Investment::create(array_merge(['user_id' => $user->id], $d));
+        }
+    }
+
+    /**
+     * Seed 2 demo debts (FASE 5) — 1 active, 1 paid off.
+     */
+    private function seedDebts(User $user): void
+    {
+        if (Debt::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $defs = [
+            [
+                'creditor' => 'Itaú',
+                'description' => 'Financiamento do carro',
+                'total_balance_cents' => 2500000,
+                'interest_rate_annual' => 0.144,
+                'monthly_payment_cents' => 85000,
+                'start_date' => now()->subMonths(6)->toDateString(),
+                'payoff_strategy' => 'sac',
+                'currency' => 'BRL',
+                'is_paid_off' => false,
+                'paid_off_at' => null,
+                'notes' => 'Carro financiado em 36 meses',
+            ],
+            [
+                'creditor' => 'Nubank',
+                'description' => 'Cartão de crédito antigo',
+                'total_balance_cents' => 0,
+                'interest_rate_annual' => 0.0,
+                'monthly_payment_cents' => 0,
+                'start_date' => now()->subYear()->toDateString(),
+                'payoff_strategy' => 'price',
+                'currency' => 'BRL',
+                'is_paid_off' => true,
+                'paid_off_at' => now()->subMonths(2)->toDateString(),
+                'notes' => 'Fechado em maio/2026',
+            ],
+        ];
+
+        foreach ($defs as $d) {
+            Debt::create(array_merge(['user_id' => $user->id], $d));
         }
     }
 }

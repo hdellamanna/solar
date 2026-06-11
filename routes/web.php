@@ -84,6 +84,13 @@ Route::middleware('auth')->group(function () {
     // Investments (FASE 5) — tracked portfolio positions
     Route::resource('investments', \App\Http\Controllers\InvestmentController::class);
 
+    // Debts (FASE 5) — tracked debts with SAC/Price simulator
+    Route::resource('debts', \App\Http\Controllers\DebtController::class);
+    Route::post('/debts/{debt}/simulate', [\App\Http\Controllers\DebtController::class, 'simulate'])
+        ->name('debts.simulate');
+    Route::patch('/debts/{debt}/mark-paid', [\App\Http\Controllers\DebtController::class, 'markAsPaidOff'])
+        ->name('debts.mark-paid');
+
     // Reports (FASE 2C)
     Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index'])->name('reports.index');
 
