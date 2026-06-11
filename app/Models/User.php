@@ -19,6 +19,7 @@ class User extends Authenticatable
         'password',
         'theme',
         'home_currency',
+        'use_ai_categorize',
     ];
 
     protected $hidden = [
@@ -32,6 +33,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'use_ai_categorize' => 'boolean',
+            'last_ai_suggestion_at' => 'datetime',
         ];
     }
 
@@ -74,7 +76,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Investment positions owned by this user.
+     * Investment positions owned by this user (FASE 5).
      */
     public function investments(): HasMany
     {
@@ -82,7 +84,7 @@ class User extends Authenticatable
     }
 
     /**
-     * Debts owned by this user.
+     * Debts owned by this user (FASE 5).
      */
     public function debts(): HasMany
     {

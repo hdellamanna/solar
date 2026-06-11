@@ -2,6 +2,7 @@
 import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SplitEditor from '@/Components/SplitEditor.vue';
+import { useAiCategorize } from '@/Composables/useAiCategorize';
 import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
@@ -10,6 +11,10 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     users: { type: Array, default: () => [] },
 });
+
+const ai = useAiCategorize();
+const aiToast = ref(null);
+let aiToastTimer = null;
 
 const form = useForm({
     type: props.transaction?.type || 'expense',
@@ -96,6 +101,37 @@ const submit = () => {
         form.post(route('transactions.store'));
     }
 };
+
+const showAiSuggest = computed(() => {
+    const user = $page.props?.auth?.user;
+    return Boolean(user?.use_ai_categorize) && (form.description || '').trim().length >= 3;
+});
+
+const aiConfidencePct = (confidence) => {
+    if (confidence === null || confidence === undefined) return '?';
+    return Math.round(Number(confidence) * 100);
+};
+
+async function suggestCategory() {
+    aiToast.value = null;
+    const { ok, payload, message } = await ai.suggest(form.description);
+    if (!ok) {
+        aiToast.value = { kind: 'error', text: message || 'Não foi possível sugerir uma categoria.' };
+        scheduleToastClear();
+        return;
+    }
+    form.category_id = payload.category_id;
+    aiToast.value = {
+        kind: 'success',
+        text: `Categoria sugerida: ${payload.category_name} (${aiConfidencePct(payload.confidence)}% confiança)`,
+    };
+    scheduleToastClear();
+}
+
+function scheduleToastClear() {
+    if (aiToastTimer) clearTimeout(aiToastTimer);
+    aiToastTimer = setTimeout(() => { aiToast.value = null; }, 5000);
+}
 </script>
 
 <template>
@@ -164,10 +200,36 @@ const submit = () => {
 
                 <div v-if="form.type !== 'transfer'">
                     <label class="block text-sm font-medium mb-1">Categoria</label>
-                    <select v-model="form.category_id" class="input">
-                        <option value="">Sem categoria</option>
-                        <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
-                    </select>
+                    <div class="flex items-center gap-2">
+                        <select v-model="form.category_id" class="input flex-1">
+                            <option value="">Sem categoria</option>
+                            <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
+                        </select>
+                        <button
+                            v-if="showAiSuggest"
+                            type="button"
+                            class="btn-secondary shrink-0"
+                            :disabled="ai.loading"
+                            @click="suggestCategory"
+                            data-testid="ai-suggest-button"
+                        >
+                            <span v-if="ai.loading" class="inline-flex items-center gap-1">
+                                <svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40 60" stroke-linecap="round" /></svg>
+                                ...
+                            </span>
+                            <span v-else>✨ Sugerir categoria</span>
+                        </button>
+                    </div>
+                    <p
+                        v-if="aiToast"
+                        :class="[
+                            'mt-2 text-xs',
+                            aiToast.kind === 'success' ? 'text-brand-600 dark:text-brand-400' : 'text-expense',
+                        ]"
+                        data-testid="ai-suggest-toast"
+                    >
+                        {{ aiToast.text }}
+                    </p>
                 </div>
 
                 <div v-if="form.type === 'transfer'" class="grid grid-cols-1 sm:grid-cols-2 gap-3">

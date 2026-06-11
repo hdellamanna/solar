@@ -78,6 +78,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/subscriptions/{subscription}/reactivate', [\App\Http\Controllers\SubscriptionController::class, 'reactivate'])
         ->name('subscriptions.reactivate');
 
+    // Debts (FASE 5) — tracked financing contracts with SAC/Price simulator
+    Route::resource('debts', \App\Http\Controllers\DebtController::class);
+    Route::post('/debts/{debt}/simulate', [\App\Http\Controllers\DebtController::class, 'simulate'])
+        ->name('debts.simulate');
+    Route::patch('/debts/{debt}/mark-paid', [\App\Http\Controllers\DebtController::class, 'markAsPaidOff'])
+        ->name('debts.mark-paid');
+
     // PIX (FASE 4C) — dedicated PIX UI
     Route::get('/pix', [\App\Http\Controllers\PixController::class, 'index'])->name('pix.index');
 
@@ -102,7 +109,7 @@ Route::middleware('auth')->group(function () {
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    // FASE 5 — opt-in toggle for the AI category suggester.
+    // FASE 5 — opt-in toggle for AI category suggestions.
     Route::patch('/profile/ai-preference', [ProfileController::class, 'updateAiPreference'])
         ->name('profile.ai-preference');
 });

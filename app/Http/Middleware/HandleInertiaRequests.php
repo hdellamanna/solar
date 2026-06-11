@@ -46,6 +46,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'theme' => $user->theme ?? 'system',
+                    'use_ai_categorize' => (bool) ($user->use_ai_categorize ?? false),
                     'initials' => $user->initials(),
                 ] : null,
             ],
