@@ -1,9 +1,33 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 
 const form = useForm({ email: '', password: '', remember: false });
+const page = usePage();
 const submit = () => form.post(route('login'), { onFinish: () => form.reset('password') });
+
+// Surface a verification-needed banner whenever either:
+//   (a) the form was submitted and Laravel returned a validation error
+//       on the email field (e.g. via back()->withErrors() on a 302), or
+//   (b) a session error was flashed before redirecting to /login and
+//       landed in Inertia's shared `errors` prop.
+const errorMessage = computed(() => {
+    const fromForm = form.errors?.email;
+    if (fromForm) return fromForm;
+    // Inertia 3: page.props is reactive; in <script setup> we read
+    // .errors?.email directly (the auto-unwrapped accessor).
+    const props = page.props;
+    return props?.errors?.email ?? null;
+});
+// The backend sets a verification-needed error with "Verifique seu email"
+// in it — surface a "resend" link in that case. Match a few stems
+// defensively to handle future backend copy variations
+// ("verifique", "verifica", "verifique seu email", etc).
+const isVerificationError = computed(() => {
+    const msg = errorMessage.value ?? '';
+    return /verif/i.test(msg);
+});
 </script>
 
 <template>
@@ -14,6 +38,51 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
             <p class="text-sm text-ink-500 dark:text-ink-400 mt-2">
                 Entre na sua conta pra ver onde o sol brilha hoje.
             </p>
+
+            <!--
+                Error banner (FASE 4D): shown when backend returns a
+                form-level error on the email field. If the message is
+                a verification-needed error, we also surface a
+                "Reenviar email de verificação" link that takes the
+                user to the verification notice page where the actual
+                Resend button lives.
+            -->
+            <Transition
+                enter-active-class="transition duration-300 ease-spring"
+                enter-from-class="opacity-0 -translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-200"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0">
+                <div
+                    v-if="errorMessage"
+                    class="mt-6 p-3.5 rounded-2xl card-glass
+                           bg-rose-50/70 dark:bg-rose-500/10
+                           border border-rose-200/70 dark:border-rose-500/30
+                           text-sm text-rose-700 dark:text-rose-300
+                           flex items-start gap-2.5"
+                    role="alert"
+                >
+                    <svg class="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4a2 2 0 00-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+                    </svg>
+                    <div class="flex-1 min-w-0">
+                        <p>{{ errorMessage }}</p>
+                        <Link
+                            v-if="isVerificationError"
+                            :href="route('verification.notice')"
+                            class="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-rose-800 dark:text-rose-200
+                                   hover:text-rose-900 dark:hover:text-rose-100 underline underline-offset-2"
+                        >
+                            Reenviar email de verificação
+                            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </Link>
+                    </div>
+                </div>
+            </Transition>
 
             <form @submit.prevent="submit" class="mt-8 space-y-4">
                 <div>
@@ -51,7 +120,6 @@ const submit = () => form.post(route('login'), { onFinish: () => form.reset('pas
                     >
                     <span class="text-ink-600 dark:text-ink-300">Lembrar de mim</span>
                 </label>
-                <div v-if="form.errors.email" class="text-sm text-expense">{{ form.errors.email }}</div>
                 <button
                     type="submit"
                     class="btn-primary w-full mt-2"
