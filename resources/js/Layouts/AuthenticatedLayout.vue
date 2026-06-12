@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import { useTheme } from '@/Composables/useTheme';
 import { useShortcuts } from '@/Composables/useShortcuts';
@@ -15,6 +15,57 @@ const user = computed(() => page.props.auth?.user);
 const { isDark, init: initTheme, toggle: toggleTheme } = useTheme();
 const sidebarOpen = ref(false);
 const userMenuOpen = ref(false);
+
+// ─── Email verification banner (FASE 4D) ──────────────────────────────
+// Shows at the top of the main content area when the authenticated
+// user has not yet verified their email. Dismissable per-session.
+const isUnverified = computed(() => {
+    const u = user.value;
+    if (!u) return false;
+    // The backend shares `email_verified_at` as an ISO 8601 string
+    // (or null). Treat null/undefined/missing as "unverified".
+    if (!('email_verified_at' in u)) return false; // prop absent → don't know → don't show
+    return u.email_verified_at === null || u.email_verified_at === undefined;
+});
+const bannerDismissed = ref(false);
+onMounted(() => {
+    try {
+        bannerDismissed.value = sessionStorage.getItem('verify_banner_dismissed') === '1';
+    } catch (e) {
+        // sessionStorage may be unavailable (private mode, SSR) — ignore
+    }
+});
+const dismissBanner = () => {
+    bannerDismissed.value = true;
+    try { sessionStorage.setItem('verify_banner_dismissed', '1'); } catch (e) { /* ignore */ }
+};
+// Reset dismissal once the user becomes verified.
+watch(isUnverified, (v) => {
+    if (!v) {
+        bannerDismissed.value = false;
+        try { sessionStorage.removeItem('verify_banner_dismissed'); } catch (e) { /* ignore */ }
+    }
+});
+// Local "resend" state — useForm would be cleaner but we want to keep
+// the layout focused; a plain POST is enough.
+const resendState = ref({ processing: false, cooldown: false });
+let cooldownTimer = null;
+const resendVerification = () => {
+    if (resendState.value.processing || resendState.value.cooldown) return;
+    resendState.value.processing = true;
+    router.post(route('verification.resend'), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            resendState.value.processing = false;
+            resendState.value.cooldown = true;
+            if (cooldownTimer) clearTimeout(cooldownTimer);
+            cooldownTimer = setTimeout(() => {
+                resendState.value.cooldown = false;
+                cooldownTimer = null;
+            }, 30 * 1000);
+        },
+    });
+};
 
 // Global search
 const searchInput = ref(null);
@@ -357,6 +408,93 @@ const totalResults = () => {
                     </div>
                 </div>
             </header>
+
+            <!--
+                Email verification banner (FASE 4D).
+                Amber alert pinned to the top of the main content area
+                (not the sidebar) when the authenticated user has not
+                yet confirmed their email. Dismissable for the session.
+            -->
+            <Transition
+                enter-active-class="transition duration-300 ease-spring"
+                enter-from-class="opacity-0 -translate-y-2"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-200"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0 -translate-y-2">
+                <div
+                    v-if="isUnverified && !bannerDismissed"
+                    class="mx-4 md:mx-6 lg:mx-8 mt-4 md:mt-6"
+                    role="alert"
+                >
+                    <div class="flex items-start gap-3 p-3.5 rounded-2xl
+                                bg-amber-50/85 dark:bg-amber-500/10
+                                border border-amber-200/70 dark:border-amber-500/30
+                                shadow-soft
+                                text-amber-900 dark:text-amber-200">
+                        <!-- Amber envelope icon -->
+                        <div class="w-9 h-9 rounded-xl grid place-items-center shrink-0
+                                    bg-amber-100 dark:bg-amber-500/20
+                                    text-amber-700 dark:text-amber-300">
+                            <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-width="1.8"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="5" width="18" height="14" rx="3" />
+                                <path d="M3 7l9 6 9-6" />
+                            </svg>
+                        </div>
+
+                        <div class="flex-1 min-w-0 text-sm leading-snug">
+                            <p class="font-semibold">Confirme seu email para liberar todas as funcionalidades.</p>
+                            <p class="mt-0.5 text-amber-800/85 dark:text-amber-200/85 text-xs">
+                                Enviamos um link para
+                                <span class="font-semibold break-all">{{ user?.email }}</span>
+                                — o link expira em 60 minutos.
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button
+                                type="button"
+                                @click="resendVerification"
+                                :disabled="resendState.processing || resendState.cooldown"
+                                class="px-3 py-1.5 rounded-lg text-xs font-semibold
+                                       bg-amber-600 hover:bg-amber-700
+                                       text-white shadow-sm
+                                       transition-colors duration-200
+                                       disabled:opacity-60 disabled:cursor-not-allowed
+                                       cursor-pointer"
+                            >
+                                <span v-if="resendState.processing">Enviando...</span>
+                                <span v-else-if="resendState.cooldown">Aguarde 30s</span>
+                                <span v-else>Reenviar</span>
+                            </button>
+                            <button
+                                type="button"
+                                @click="logout"
+                                class="px-3 py-1.5 rounded-lg text-xs font-semibold
+                                       text-amber-800 dark:text-amber-200
+                                       hover:bg-amber-100 dark:hover:bg-amber-500/20
+                                       transition-colors duration-200 cursor-pointer"
+                            >
+                                Sair
+                            </button>
+                            <button
+                                type="button"
+                                @click="dismissBanner"
+                                class="p-1.5 rounded-lg text-amber-700/80 dark:text-amber-300/80
+                                       hover:bg-amber-100 dark:hover:bg-amber-500/20
+                                       transition-colors duration-200 cursor-pointer"
+                                aria-label="Fechar"
+                            >
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
 
             <main class="flex-1 px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto">
                 <slot />

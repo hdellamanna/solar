@@ -1,9 +1,12 @@
-Confirme seu email - Solar Money
+Olá {{ $user->name }},
 
-Ola {{ $user->name }},
-
-clique no link abaixo para confirmar seu email e comecar a usar o Solar Money. O link expira em 60 minutos.
+Clique no link abaixo para confirmar seu email e começar a usar o Solar Money.
+O link expira em 60 minutos.
 
 {{ $verificationUrl }}
 
-Se voce nao criou essa conta, ignore este email.
+Se você não criou essa conta, ignore este email.
+
+--
+Solar Money
+Suas finanças, com luz própria.
