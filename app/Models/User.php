@@ -92,6 +92,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Email verification tokens issued to this user (FASE 4D / Auth Phase 1).
+     */
+    public function emailVerificationTokens(): HasMany
+    {
+        return $this->hasMany(EmailVerificationToken::class);
+    }
+
+    /**
      * Initials used for the avatar in the top bar.
      */
     public function initials(): string
@@ -99,6 +107,7 @@ class User extends Authenticatable
         $parts = preg_split('/\s+/', trim($this->name)) ?: [];
         $first = mb_substr($parts[0] ?? '?', 0, 1);
         $last = mb_substr($parts[count($parts) - 1] ?? '', 0, 1);
-        return mb_strtoupper($first . $last);
+
+        return mb_strtoupper($first.$last);
     }
 }
