@@ -9,7 +9,8 @@ click it, and the `verified` middleware blocks access to every authenticated
 route (except verification flow + logout) until confirmation. Re-send is
 rate-limited to once per 30 s with a 5-sends-per-hour cap.
 
-**Test count:** 212 (baseline) → **214 passing** (+2 new in `AuthTest`).
+**Test count:** 212 (baseline) → **226 passing** (+2 new in `AuthTest`, +12
+new in `EmailVerificationTest`).
 **Build:** `npm run build` succeeds. **Pint:** clean.
 
 ## Files created
@@ -26,6 +27,7 @@ rate-limited to once per 30 s with a 5-sends-per-hour cap.
 - `app/Mail/VerifyEmailMail.php`
 - `resources/views/emails/verify-email.blade.php` (plain HTML, inline CSS — no Liquid Crystal per design)
 - `resources/views/emails/verify-email-text.blade.php` (text fallback for the Mailable)
+- `tests/Feature/Auth/EmailVerificationTest.php` (the 12 dedicated tests)
 
 ## Files modified
 
@@ -47,26 +49,46 @@ rate-limited to once per 30 s with a 5-sends-per-hour cap.
 
 ## Commits
 
-- `8efdb70c46f5524dd9a8a7677eb5bbf29cec1899` — *feat(auth): email verification backend (FASE 4D / Auth Phase 1)* on `feature/auth-p1-backend`
-- Pushed to `origin/feature/auth-p1-backend` (PR will be opened by Mavis after the verifier passes)
+- `8efdb70` — *feat(auth): email verification backend* (impl)
+- `7bbd0a0` — *docs(auth): add deliverable.md*
+- `7edf204` — *test(auth): add 12 dedicated EmailVerificationTest cases*
+
+All pushed to `origin/feature/auth-p1-backend`. PR will be opened by Mavis
+after the verifier passes.
 
 ## Test counts
 
 | Suite | Before | After | Δ |
 |---|---|---|---|
 | Unit | 30 | 30 | 0 |
-| Feature | 182 | 184 | +2 (the 2 new tests in `AuthTest`) |
-| **Total** | **212** | **214** | **+2** |
+| Feature | 182 | 196 | +14 (2 new in `AuthTest`, 12 new in `EmailVerificationTest`) |
+| **Total** | **212** | **226** | **+14** |
 
-The tester track will add the dedicated `tests/Feature/Auth/EmailVerificationTest.php` with the 12 tests listed in the design doc (throttling, expiry, reuse, etc.). Their work was not in scope for this task — the spec asked me to keep `AuthTest` green, which I did.
+The 12 tests in `tests/Feature/Auth/EmailVerificationTest.php` correspond
+1:1 to the design doc:
+
+1. `test_user_cannot_login_without_verified_email`
+2. `test_register_sends_verification_email_and_does_not_login`
+3. `test_verification_link_marks_email_verified_and_redirects_to_dashboard`
+4. `test_verification_link_expires_after_60_minutes`
+5. `test_verification_link_cannot_be_reused`
+6. `test_invalid_token_redirects_to_notice_with_error`
+7. `test_resend_button_throttles_to_one_per_30s`
+8. `test_resend_button_caps_at_5_per_hour`
+9. `test_middleware_blocks_auth_routes_until_verified`
+10. `test_demo_user_is_pre_verified_in_seeder`
+11. `test_verified_user_can_access_dashboard`
+12. `test_email_contains_signed_url_with_token`
 
 ## Deviations from the design doc
 
 1. **Blade view uses ASCII-only accents** (the design says "Ol\u00e1" in the example but the mailer config refuses non-ASCII subjects, and Latin-1 character references in body text get mangled by some clients). I went with `Ola` (no accent) inside the email body and ASCII-only in the subject. Body text content matches the design intent.
 2. **Verify route lives outside the `auth` group** so the flow works when the user opens the link in a browser where they have no session. The controller logs the verified user in.
-3. **LoginController no longer regenerates the session before the email check** — kept the order: `Auth::attempt` → `session()->regenerate()` → `hasVerifiedEmail()`. This is the existing order plus the new check; no extra regen is needed because we're staying logged in regardless.
-4. **Pint auto-applied minor style fixes** to pre-existing lines (concat spacing, blank-line-before-return, etc.) in `routes/web.php`, `User.php`, and `bootstrap/app.php`. Functional code is unchanged.
-5. **Text fallback email view** (`emails/verify-email-text.blade.php`) added so the Mailable's `text:` parameter resolves; the Mailable uses the `text` field in `Content()` and Laravel requires a real view to exist (a missing text view would warn in production for non-HTML clients).
+3. **Pint auto-applied minor style fixes** to pre-existing lines (concat spacing, blank-line-before-return, etc.) in `routes/web.php`, `User.php`, and `bootstrap/app.php`. Functional code is unchanged.
+4. **Text fallback email view** (`emails/verify-email-text.blade.php`) added so the Mailable's `text:` parameter resolves; the Mailable uses the `text` field in `Content()` and Laravel requires a real view to exist (a missing text view would warn in production for non-HTML clients).
+5. **`EmailVerificationTest` test #3** uses a fresh `URL::temporarySignedRoute` URL for each test case (rather than re-using a route helper) because the verify route lives under the `signed` middleware. Same applies to tests #4, #5 and #6 — they construct a properly-signed URL via the `URL` facade so the `signed` middleware passes the request through to the service, which is the layer under test.
+6. **`EmailVerificationTest` tests #7 and #8** assert on `assertSessionHas('success'|'error')` instead of `assertRedirect` because the controller uses `back()` (which redirects to the request's referrer — empty in a unit test). The flash key is the source of truth for whether the resend went through or was throttled.
+7. **Test #7 includes a "rewind" assertion** that proves the rejection is the cooldown, not a bug elsewhere: it rewinds the `last_sent` cache key, posts again, and confirms the mail count goes from 1 to 2.
 
 ## How to verify locally
 
@@ -75,7 +97,7 @@ cd /tmp/solar-auth-p1-backend
 composer dump-autoload
 php artisan migrate     # adds email_verification_tokens table
 npm run build           # vite manifest
-php artisan test        # 214 passed
+php artisan test        # 226 passed
 ```
 
 ## Notes for the verifier
@@ -93,11 +115,12 @@ php artisan test        # 214 passed
   foreseeable hash upgrade.
 - The demo user `demo@solar.app` is already verified by the existing
   seeder, so local dev keeps working as before.
+- `EmailVerificationTest::setUp()` calls `Cache::flush()` so the throttle
+  counters start at zero for each test (the `array` cache backend
+  persists across tests within the same process).
 
 ## Out of scope (per the task)
 
-- `tests/Feature/Auth/EmailVerificationTest.php` — 12 dedicated tests in the
-  design doc are the tester track's responsibility.
 - `resources/js/Pages/Auth/VerifyEmailNotice.vue` — frontend track.
 - `resources/js/Pages/Auth/Login.vue` and
   `resources/js/Layouts/AuthenticatedLayout.vue` — frontend track.
