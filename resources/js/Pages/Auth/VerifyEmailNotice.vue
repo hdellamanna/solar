@@ -1,5 +1,5 @@
 <script setup>
-import { Head, useForm, usePage, router } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 
@@ -12,6 +12,7 @@ const flashSuccess = computed(() => page.props.flash?.success ?? null);
 const flashError = computed(() => page.props.flash?.error ?? null);
 
 const resend = useForm({});
+const logoutForm = useForm({});
 
 const cooldownActive = ref(false);
 let cooldownTimer = null;
@@ -33,7 +34,7 @@ const submitResend = () => {
     });
 };
 
-const logout = () => router.post(route('logout'));
+const logout = () => logoutForm.post(route('logout'));
 </script>
 
 <template>
