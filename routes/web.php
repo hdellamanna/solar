@@ -62,9 +62,25 @@ Route::middleware('guest')->group(function () {
     // level via the token's `expires_at`.
     Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
-    Route::post('/reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.update');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Password update (FASE 4D / Auth Phase 2)
+|--------------------------------------------------------------------------
+|
+| Deliberately OUTSIDE the `guest` middleware group: a successful reset
+| auto-logs the user in (`NewPasswordController::store` calls
+| `Auth::login()`), and the token is single-use. A second POST with the
+| same token must reach the controller so it can throw
+| `InvalidResetTokenException` and surface the design-doc "bad token"
+| UX (bounce back to forgot-password with a friendly flash). The
+| `RedirectIfAuthenticated` middleware on the `guest` group would
+| otherwise short-circuit the second POST to /dashboard before the
+| service-layer replay check runs.
+*/
+Route::post('/reset-password', [NewPasswordController::class, 'store'])
+    ->name('password.update');
 
 /*
 |--------------------------------------------------------------------------
