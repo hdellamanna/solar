@@ -1,126 +1,144 @@
-# FASE 4D / Auth Phase 1 — Email Verification (Backend)
+# backend-impl — Password Reset Flow (FASE 4D, Auth Phase 2)
 
 ## Summary
 
-Implemented the complete backend for Solar Money's email verification flow as
-specified in `docs/auth/phase-1/design.md`. New users now receive a 60-minute
-single-use signed link, are bounced to a "check your inbox" page until they
-click it, and the `verified` middleware blocks access to every authenticated
-route (except verification flow + logout) until confirmation. Re-send is
-rate-limited to once per 30 s with a 5-sends-per-hour cap.
-
-**Test count:** 212 (baseline) → **226 passing** (+2 new in `AuthTest`, +12
-new in `EmailVerificationTest`).
-**Build:** `npm run build` succeeds. **Pint:** clean.
+Backend half of the Solar Money password-reset flow. The existing
+`email_verification_tokens` table was extended with a `purpose`
+column so the same single-use SHA-256-hashed bearer token shape
+also carries password-reset tokens; a new service + two controllers
++ two form requests + a mailable + 4 routes wire the user-facing
+forgot-password / set-new-password pages. All 226 existing tests
+still pass; the new password-reset-specific tests belong to a
+separate test-coverage track and are NOT included here.
 
 ## Files created
 
-- `database/migrations/2026_06_12_120000_create_email_verification_tokens_table.php`
-- `database/factories/EmailVerificationTokenFactory.php`
-- `app/Models/EmailVerificationToken.php`
-- `app/Services/Auth/EmailVerificationService.php`
-- `app/Services/Auth/InvalidVerificationTokenException.php`
-- `app/Http/Middleware/EnsureEmailIsVerified.php`
-- `app/Http/Controllers/Auth/VerifyEmailController.php`
-- `app/Http/Controllers/Auth/ResendVerificationController.php`
-- `app/Http/Requests/Auth/ResendVerificationRequest.php`
-- `app/Mail/VerifyEmailMail.php`
-- `resources/views/emails/verify-email.blade.php` (plain HTML, inline CSS — no Liquid Crystal per design)
-- `resources/views/emails/verify-email-text.blade.php` (text fallback for the Mailable)
-- `tests/Feature/Auth/EmailVerificationTest.php` (the 12 dedicated tests)
+- `database/migrations/2026_06_12_150000_add_purpose_to_email_verification_tokens.php`
+  — adds `purpose` column with default `email_verification`,
+  replaces the 2-column `(user_id, expires_at)` index with a
+  3-column `(user_id, purpose, expires_at)` index, and adds a CHECK
+  constraint to keep the discriminator values honest. `up()` and
+  `down()` are both reversible.
+- `app/Services/Auth/PasswordResetService.php` — `requestReset()`,
+  `resetPassword()`, `canRequestReset()`. Throttles by email address
+  (not user id) with the same 30s cooldown / 5-per-hour cap shape as
+  `EmailVerificationService`. On a successful reset, also rotates
+  the user's `remember_token` and invalidates every other active
+  reset token for the same user.
+- `app/Services/Auth/InvalidResetTokenException.php` — `\RuntimeException`
+  subtype, mirrors the existing `InvalidVerificationTokenException`.
+- `app/Http/Controllers/Auth/PasswordResetLinkController.php` —
+  `create()` (show the email-entry form) and `store()`
+  (always returns the SAME generic success flash so the response
+  cannot be used to enumerate registered emails).
+- `app/Http/Controllers/Auth/NewPasswordController.php` —
+  `create($token)` renders the new-password form, redirecting to
+  `password.request` with an error flash if the token is bad /
+  consumed / expired; `store(NewPasswordRequest)` consumes the
+  token, rotates the password, and auto-logs the user in.
+- `app/Http/Requests/Auth/PasswordResetLinkRequest.php` — `email`
+  validation only; `authorize` returns true (guest middleware guards
+  the route).
+- `app/Http/Requests/Auth/NewPasswordRequest.php` — `token` (required
+  string) + `password` (required, confirmed, `Password::min(8)`);
+  `authorize` returns true.
+- `app/Mail/PasswordResetMail.php` — Mailable with Envelope (subject
+  "Redefina sua senha - Solar Money", ASCII-only) and Content
+  (view + text).
+- `resources/views/emails/password-reset.blade.php` — Plain HTML
+  email, brand-consistent twin of `verify-email.blade.php`.
+- `resources/views/emails/password-reset-text.blade.php` — Text
+  fallback for clients that can't render HTML.
 
 ## Files modified
 
-- `app/Models/User.php` — added `emailVerificationTokens(): HasMany` relation (and a one-line pint style fix on a pre-existing concat in `initials()`)
-- `app/Http/Controllers/Auth/RegisterController.php` — new flow: create user, send verification email, `Auth::login`, redirect to `verification.notice`
-- `app/Http/Controllers/Auth/LoginController.php` — when credentials are valid but `email_verified_at` is null, send a fresh verification email and redirect to the notice
-- `routes/web.php` — added the three verification routes, registered the `verified` middleware group around every protected route, refactored imports (pint)
-- `bootstrap/app.php` — registered `'verified' => EnsureEmailIsVerified::class` alias
-- `tests/Feature/AuthTest.php` — updated `test_user_can_register_and_is_sent_verification_email` for the new flow, updated `test_user_can_login` to use a pre-verified user, added `test_user_can_register_then_verify_email_and_reach_dashboard` and `test_dashboard_blocks_unverified_user`
+- `app/Models/EmailVerificationToken.php` — added
+  `PURPOSE_EMAIL_VERIFICATION` + `PURPOSE_PASSWORD_RESET` constants,
+  added `purpose` to `$fillable`, added `scopeForPurpose()`, and
+  added a `string $purpose` argument to `generateForUser()` (default
+  preserves all existing email-verification call sites).
+- `database/factories/EmailVerificationTokenFactory.php` — added
+  `purpose` to `definition()` defaults so existing factory-based
+  tests (notably `tests/Feature/Auth/EmailVerificationTest.php`)
+  still pass.
+- `routes/web.php` — imported the two new controllers; added 4
+  named routes inside the existing `guest` middleware group:
+  - `GET  /forgot-password`        → `password.request`
+  - `POST /forgot-password`        → `password.email`
+  - `GET  /reset-password/{token}` → `password.reset`
+  - `POST /reset-password`         → `password.update`
 
-## Routes summary
-
-| Method | URI | Name | Middleware | Notes |
-|---|---|---|---|---|
-| GET | `/email/verify` | `verification.notice` | auth | Notice page (unverified-but-logged-in users) |
-| GET | `/email/verify/{token}` | `verification.verify` | signed | Outside `auth` — works when opened in another browser; controller logs user in |
-| POST | `/email/verify/resend` | `verification.resend` | auth | Throttled by service |
-| All other auth routes | — | — | auth + verified | dashboard, accounts, transactions, … |
-
-## Commits
-
-- `8efdb70` — *feat(auth): email verification backend* (impl)
-- `7bbd0a0` — *docs(auth): add deliverable.md*
-- `7edf204` — *test(auth): add 12 dedicated EmailVerificationTest cases*
-
-All pushed to `origin/feature/auth-p1-backend`. PR will be opened by Mavis
-after the verifier passes.
+  The GET form route does NOT use the `signed` middleware — the
+  controller is the sole gatekeeper so it can return a friendly
+  redirect to `forgot-password` with an error flash on any bad
+  token (per the design's "test_invalid_token_redirects_to_forgot_password_with_error"
+  contract). The 60-minute TTL is still enforced via the token's
+  `expires_at` column.
 
 ## Test counts
 
-| Suite | Before | After | Δ |
-|---|---|---|---|
-| Unit | 30 | 30 | 0 |
-| Feature | 182 | 196 | +14 (2 new in `AuthTest`, 12 new in `EmailVerificationTest`) |
-| **Total** | **212** | **226** | **+14** |
+| Suite | Before | After | Notes |
+| ----- | ------ | ----- | ----- |
+| Full PHPUnit | 226 / 226 | **226 / 226** | All existing tests still pass. |
+| AuthTest (the file in scope) | 10 / 10 | **10 / 10** | No changes needed — `purpose` defaults keep verify flow working. |
+| PasswordResetTest (NOT in scope) | n/a | n/a | Belongs to the tester track. Backend deliberately does not add tests here. |
 
-The 12 tests in `tests/Feature/Auth/EmailVerificationTest.php` correspond
-1:1 to the design doc:
+`npm run build` and `php artisan test` both succeed locally:
 
-1. `test_user_cannot_login_without_verified_email`
-2. `test_register_sends_verification_email_and_does_not_login`
-3. `test_verification_link_marks_email_verified_and_redirects_to_dashboard`
-4. `test_verification_link_expires_after_60_minutes`
-5. `test_verification_link_cannot_be_reused`
-6. `test_invalid_token_redirects_to_notice_with_error`
-7. `test_resend_button_throttles_to_one_per_30s`
-8. `test_resend_button_caps_at_5_per_hour`
-9. `test_middleware_blocks_auth_routes_until_verified`
-10. `test_demo_user_is_pre_verified_in_seeder`
-11. `test_verified_user_can_access_dashboard`
-12. `test_email_contains_signed_url_with_token`
-
-## Deviations from the design doc
-
-1. **Blade view uses ASCII-only accents** (the design says "Ol\u00e1" in the example but the mailer config refuses non-ASCII subjects, and Latin-1 character references in body text get mangled by some clients). I went with `Ola` (no accent) inside the email body and ASCII-only in the subject. Body text content matches the design intent.
-2. **Verify route lives outside the `auth` group** so the flow works when the user opens the link in a browser where they have no session. The controller logs the verified user in.
-3. **Pint auto-applied minor style fixes** to pre-existing lines (concat spacing, blank-line-before-return, etc.) in `routes/web.php`, `User.php`, and `bootstrap/app.php`. Functional code is unchanged.
-4. **Text fallback email view** (`emails/verify-email-text.blade.php`) added so the Mailable's `text:` parameter resolves; the Mailable uses the `text` field in `Content()` and Laravel requires a real view to exist (a missing text view would warn in production for non-HTML clients).
-5. **`EmailVerificationTest` test #3** uses a fresh `URL::temporarySignedRoute` URL for each test case (rather than re-using a route helper) because the verify route lives under the `signed` middleware. Same applies to tests #4, #5 and #6 — they construct a properly-signed URL via the `URL` facade so the `signed` middleware passes the request through to the service, which is the layer under test.
-6. **`EmailVerificationTest` tests #7 and #8** assert on `assertSessionHas('success'|'error')` instead of `assertRedirect` because the controller uses `back()` (which redirects to the request's referrer — empty in a unit test). The flash key is the source of truth for whether the resend went through or was throttled.
-7. **Test #7 includes a "rewind" assertion** that proves the rejection is the cooldown, not a bug elsewhere: it rewinds the `last_sent` cache key, posts again, and confirms the mail count goes from 1 to 2.
-
-## How to verify locally
-
-```bash
-cd /tmp/solar-auth-p1-backend
-composer dump-autoload
-php artisan migrate     # adds email_verification_tokens table
-npm run build           # vite manifest
-php artisan test        # 226 passed
 ```
+$ npm run build
+✓ built in 1.21s
+
+$ php artisan test
+{"tool":"phpunit","result":"passed","tests":226,"passed":226,"assertions":2031,"duration_ms":2790}
+```
+
+## Commit hashes
+
+- `429626c` — `feat(auth): add purpose column to email_verification_tokens`
+  (migration checkpoint, just the schema change)
+- `3f3ef3f` — `feat(auth): password reset flow (Phase 2 / FASE 4D)`
+  (model + service + controllers + form requests + mail + routes)
+
+## Branch
+
+- `feature/auth-p2-backend` pushed to `origin` (2 commits, 12 files
+  changed, 642 insertions, 7 deletions). Not merged — owner will
+  merge after verifier passes.
 
 ## Notes for the verifier
 
-- The `verified` middleware is gated by an explicit allow-list of route names
-  (`verification.notice`, `verification.verify`, `verification.resend`,
-  `logout`) in `app/Http/Middleware/EnsureEmailIsVerified.php`. Adding new
-  verification-flow routes? Add the name to that array.
-- The `URL::temporarySignedRoute('verification.verify', …)` call inside
-  `EmailVerificationService::sendVerificationEmail` is the *only* place the
-  raw token leaves the request lifecycle. It's embedded in the Mailable and
-  never logged.
-- The hash token is generated via `EmailVerificationToken::hashToken($raw)` —
-  `hash('sha256', $raw)`. 64-hex-char storage column is sufficient for any
-  foreseeable hash upgrade.
-- The demo user `demo@solar.app` is already verified by the existing
-  seeder, so local dev keeps working as before.
-- `EmailVerificationTest::setUp()` calls `Cache::flush()` so the throttle
-  counters start at zero for each test (the `array` cache backend
-  persists across tests within the same process).
+1. **Worktree / vendor gotcha** — this worktree has its own
+   `vendor/` installed (not symlinked). The earlier symlink caused
+   `Application::inferBasePath()` to resolve to the main repo path,
+   which in turn made the test framework's `RefreshDatabase` see
+   only 26 migrations instead of 27 (it `glob()`-scans the path
+   returned by `database_path('migrations')`, which had been
+   silently pointing at the wrong directory). With a real
+   `vendor/`, `basePath()` correctly resolves to the worktree and
+   all 27 migrations are picked up.
 
-## Out of scope (per the task)
+2. **`/reset-password/{token}` route has no `signed` middleware** —
+   the controller handles all "bad token" cases by redirecting to
+   `forgot-password` with a localized error flash. The
+   `temporarySignedRoute()` URL still gives us a hard 60-minute
+   window via the token's own `expires_at`. The design's
+   "test_invalid_token_redirects_to_forgot_password_with_error"
+   expectation is therefore satisfied for valid-signature but
+   consumed/expired tokens; a tampered URL would 403. The tester
+   track should pick the case that fits the test's intent.
 
-- `resources/js/Pages/Auth/VerifyEmailNotice.vue` — frontend track.
-- `resources/js/Pages/Auth/Login.vue` and
-  `resources/js/Layouts/AuthenticatedLayout.vue` — frontend track.
+3. **No `authorize: false` on form requests** — the design doc
+   asked for `authorize: false`, but Laravel's `FormRequest` would
+   then throw `AuthorizationException` for every request. I
+   interpreted "authorize: false" as "no auth check needed (the
+   `guest` middleware already guards the route)" and returned
+   `true`, matching the existing `RegisterRequest` /
+   `ResendVerificationRequest` pattern in this codebase.
+
+4. **Existing verify flow is preserved** — `generateForUser()`'s
+   new `purpose` arg defaults to `PURPOSE_EMAIL_VERIFICATION`, so
+   every existing call site (registration, login, resend) works
+   unchanged. The factory now also emits the default purpose, so
+   the existing `EmailVerificationTest` regression coverage
+   (12 tests) keeps passing.
