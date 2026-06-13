@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\ResendVerificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
@@ -44,7 +46,41 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
     Route::post('/register', [RegisterController::class, 'store']);
+
+    // Password reset (FASE 4D / Auth Phase 2). Anyone — even an
+    // unauthenticated visitor — can hit these.
+    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
+    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->name('password.email');
+
+    // The GET form route deliberately does NOT use the `signed`
+    // middleware: the controller does the validity check itself and
+    // bounces the user back to forgot-password with a friendly
+    // error flash (the design's "bad token" UX). The signature on
+    // the URL still gives us a hard 60-minute TTL at the database
+    // level via the token's `expires_at`.
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->name('password.reset');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Password update (FASE 4D / Auth Phase 2)
+|--------------------------------------------------------------------------
+|
+| Deliberately OUTSIDE the `guest` middleware group: a successful reset
+| auto-logs the user in (`NewPasswordController::store` calls
+| `Auth::login()`), and the token is single-use. A second POST with the
+| same token must reach the controller so it can throw
+| `InvalidResetTokenException` and surface the design-doc "bad token"
+| UX (bounce back to forgot-password with a friendly flash). The
+| `RedirectIfAuthenticated` middleware on the `guest` group would
+| otherwise short-circuit the second POST to /dashboard before the
+| service-layer replay check runs.
+*/
+Route::post('/reset-password', [NewPasswordController::class, 'store'])
+    ->name('password.update');
 
 /*
 |--------------------------------------------------------------------------
