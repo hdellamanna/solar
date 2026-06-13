@@ -42,4 +42,27 @@ class EmailVerificationTokenFactory extends Factory
             'consumed_at' => now()->subSecond(),
         ]);
     }
+
+    /**
+     * Pin the token to a specific user instead of creating a new one.
+     * Use this when the test already has a user in hand and just needs
+     * a token row to belong to them.
+     */
+    public function forUser(User $user): static
+    {
+        return $this->state(fn () => [
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * Mint a token whose `purpose` column reads `password_reset`.
+     * Combine with `forUser($u)` to fully scope the row.
+     */
+    public function passwordReset(): static
+    {
+        return $this->state(fn () => [
+            'purpose' => EmailVerificationToken::PURPOSE_PASSWORD_RESET,
+        ]);
+    }
 }
