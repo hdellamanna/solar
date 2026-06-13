@@ -20,6 +20,7 @@ class EmailVerificationTokenFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
+            'purpose' => EmailVerificationToken::PURPOSE_EMAIL_VERIFICATION,
             'token_hash' => EmailVerificationToken::hashToken(fake()->sha256()),
             'expires_at' => now()->addMinutes(EmailVerificationToken::TTL_MINUTES),
             'consumed_at' => null,

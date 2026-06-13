@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\EmailVerificationTokenFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,15 +11,22 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
- * Eloquent model representing a single-use email verification token.
+ * Eloquent model representing a single-use bearer token.
  *
- * Tokens are stored as a SHA-256 hash of a 64-char random string. The raw
- * token is only ever returned by `generateForUser()` and is meant to be
- * embedded in the verification email immediately. We never log or persist
- * the raw value.
+ * Originally the table only carried email-verification tokens (FASE 4D
+ * / Auth Phase 1). As of Auth Phase 2 the same table also carries
+ * password-reset tokens; the `purpose` column is the discriminator.
+ * The class and table names are kept historical — see the design doc
+ * for the reasoning.
+ *
+ * Tokens are stored as a SHA-256 hash of a 64-char random string. The
+ * raw token is only ever returned by `generateForUser()` and is meant
+ * to be embedded in the verification / reset email immediately. We
+ * never log or persist the raw value.
  *
  * @property int $id
  * @property int $user_id
+ * @property string $purpose
  * @property string $token_hash
  * @property Carbon $expires_at
  * @property Carbon|null $consumed_at
@@ -30,9 +38,16 @@ class EmailVerificationToken extends Model
     /** @use HasFactory<EmailVerificationTokenFactory> */
     use HasFactory;
 
+    /** Token issued for the email verification flow. */
+    public const PURPOSE_EMAIL_VERIFICATION = 'email_verification';
+
+    /** Token issued for the password reset flow. */
+    public const PURPOSE_PASSWORD_RESET = 'password_reset';
+
     /** @var list<string> */
     protected $fillable = [
         'user_id',
+        'purpose',
         'token_hash',
         'expires_at',
         'consumed_at',
@@ -82,17 +97,34 @@ class EmailVerificationToken extends Model
     }
 
     /**
+     * Filter the query to only tokens minted for a given purpose
+     * (`email_verification` or `password_reset`). Use this from the
+     * service layer to keep lookups purpose-aware — mixing the two
+     * purposes in a single query is almost always a bug.
+     */
+    public function scopeForPurpose(Builder $query, string $purpose): Builder
+    {
+        return $query->where('purpose', $purpose);
+    }
+
+    /**
      * Generate a brand-new random token, persist the hash for the given
      * user, and return both the raw token (so the caller can embed it
      * in an email) and the persisted model.
      *
      * @return array{token: string, model: self}
      */
-    public static function generateForUser(User $user, ?Carbon $expiresAt = null, ?string $ip = null, ?string $ua = null): array
-    {
+    public static function generateForUser(
+        User $user,
+        ?Carbon $expiresAt = null,
+        ?string $ip = null,
+        ?string $ua = null,
+        string $purpose = self::PURPOSE_EMAIL_VERIFICATION,
+    ): array {
         $raw = Str::random(self::TOKEN_LENGTH);
         $model = self::create([
             'user_id' => $user->id,
+            'purpose' => $purpose,
             'token_hash' => self::hashToken($raw),
             'expires_at' => $expiresAt ?? now()->addMinutes(self::TTL_MINUTES),
             'ip_address' => $ip,

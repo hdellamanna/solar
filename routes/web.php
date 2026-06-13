@@ -3,6 +3,8 @@
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\ResendVerificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
@@ -44,6 +46,24 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
     Route::post('/register', [RegisterController::class, 'store']);
+
+    // Password reset (FASE 4D / Auth Phase 2). Anyone — even an
+    // unauthenticated visitor — can hit these.
+    Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
+    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->name('password.email');
+
+    // The GET form route deliberately does NOT use the `signed`
+    // middleware: the controller does the validity check itself and
+    // bounces the user back to forgot-password with a friendly
+    // error flash (the design's "bad token" UX). The signature on
+    // the URL still gives us a hard 60-minute TTL at the database
+    // level via the token's `expires_at`.
+    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->name('password.reset');
+    Route::post('/reset-password', [NewPasswordController::class, 'store'])
+        ->name('password.update');
 });
 
 /*
