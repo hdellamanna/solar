@@ -28,7 +28,13 @@ class ConfirmTwoFactorDisableRequest extends FormRequest
     {
         return [
             'token' => ['required', 'string'],
-            'password' => ['required', 'current_password'],
+            // The service layer re-checks the password against the
+            // user identified by the token — `current_password`
+            // would not work here because the user is NOT
+            // authenticated at this point (the email link IS the
+            // credential, the user may have clicked it on a
+            // different device).
+            'password' => ['required', 'string', 'min:1'],
         ];
     }
 

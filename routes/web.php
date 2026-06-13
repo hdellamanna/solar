@@ -21,6 +21,7 @@ use App\Http\Controllers\PixController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurrenceController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
@@ -89,12 +90,18 @@ Route::middleware('signed')->group(function () {
         ->name('two-factor.enable.confirm');
     Route::get('/two-factor/disable/confirm/{token}', [TwoFactorDisableController::class, 'confirmDisable'])
         ->name('two-factor.disable.confirm');
-
-    Route::post('/two-factor/enable/confirm', [TwoFactorEnableController::class, 'confirmEnableStore'])
-        ->name('two-factor.enable.store');
-    Route::post('/two-factor/disable/confirm', [TwoFactorDisableController::class, 'confirmDisableStore'])
-        ->name('two-factor.disable.store');
 });
+
+// The two POST confirmation endpoints (final action) live OUTSIDE
+// the `signed` middleware group on purpose: the `token` field in
+// the POST body is the credential (controller does its own
+// purpose + consumed + expiry check). Putting them in the
+// `signed` group would reject every legitimate POST because the
+// body is not part of the URL signature.
+Route::post('/two-factor/enable/confirm', [TwoFactorEnableController::class, 'confirmEnableStore'])
+    ->name('two-factor.enable.store');
+Route::post('/two-factor/disable/confirm', [TwoFactorDisableController::class, 'confirmDisableStore'])
+    ->name('two-factor.disable.store');
 });
 
 /*
@@ -174,6 +181,11 @@ Route::middleware('auth')->group(function () {
     // settings page and the challenge form.
     Route::middleware(['verified', 'two_factor'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Settings (Auth Phase 3 + future).
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('/settings/security', [SettingsController::class, 'security'])
+            ->name('settings.security');
 
         // 2FA settings (Auth Phase 3).
         Route::post('/settings/security/two-factor/enable', [TwoFactorEnableController::class, 'beginEnable'])

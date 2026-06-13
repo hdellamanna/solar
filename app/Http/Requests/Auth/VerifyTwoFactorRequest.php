@@ -29,7 +29,13 @@ class VerifyTwoFactorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'min:6', 'max:10'],
+            // The `code` field is dual-purpose: a 6-digit TOTP
+            // (RFC 6238 default) OR a 12-char recovery code in
+            // the `XXXX-XXXX-XX` format the enrollment service
+            // mints. The controller branches on the actual
+            // shape, so the validator only needs to enforce
+            // the longest possible value (12 chars).
+            'code' => ['required', 'string', 'min:6', 'max:12'],
             'trust_device' => ['nullable', 'boolean'],
         ];
     }
