@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureEmailIsVerified;
+use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -29,8 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Aliases. The `verified` alias is the Laravel convention and
         // is what `routes/web.php` uses to gate authenticated routes
         // behind a confirmed email address (FASE 4D / Auth Phase 1).
+        // `two_factor` is the Auth Phase 3 equivalent for the 2FA
+        // challenge.
         $middleware->alias([
             'verified' => EnsureEmailIsVerified::class,
+            'two_factor' => EnsureTwoFactorVerified::class,
         ]);
 
         // The /api/* endpoints are called from the authenticated Vue front-end
