@@ -100,6 +100,72 @@ class User extends Authenticatable
     }
 
     /**
+     * 2FA enrolment row (Auth Phase 3). A user either has one row
+     * (2FA enabled) or none.
+     */
+    public function twoFactor(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserTwoFactor::class);
+    }
+
+    /**
+     * Recovery codes (Auth Phase 3). Up to 10 per user, marked
+     * `consumed_at` after redemption.
+     */
+    public function recoveryCodes(): HasMany
+    {
+        return $this->hasMany(RecoveryCode::class);
+    }
+
+    /**
+     * Trusted-device cookies (Auth Phase 3). Up to N, capped by
+     * the user's own behaviour; not actively capped by the app.
+     */
+    public function trustedDevices(): HasMany
+    {
+        return $this->hasMany(TrustedDevice::class);
+    }
+
+    /**
+     * True when the user has completed 2FA enrollment (a row in
+     * `user_two_factor` exists and is not soft-deleted — the table
+     * does not soft-delete, the row just gets dropped on disable).
+     */
+    public function hasTwoFactorEnabled(): bool
+    {
+        return $this->twoFactor !== null;
+    }
+
+    /**
+     * True when the user has satisfied the 2FA challenge in the
+     * current session, OR has a trusted-device cookie that the
+     * middleware validated. Backed by a session key so it
+     * automatically expires when the session does.
+     */
+    public function isTwoFactorVerified(): bool
+    {
+        return (bool) session('two_factor_verified');
+    }
+
+    /**
+     * Stamp the session so the user is no longer challenged until
+     * they log out or the session expires.
+     */
+    public function markTwoFactorVerified(): void
+    {
+        session(['two_factor_verified' => true]);
+    }
+
+    /**
+     * Clear the session flag — used on disable, on logout, and in
+     * tests.
+     */
+    public function clearTwoFactorVerified(): void
+    {
+        session()->forget('two_factor_verified');
+    }
+
+    /**
      * Initials used for the avatar in the top bar.
      */
     public function initials(): string

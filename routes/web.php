@@ -7,6 +7,10 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\ResendVerificationController;
+use App\Http\Controllers\Auth\TrustedDeviceController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
+use App\Http\Controllers\Auth\TwoFactorDisableController;
+use App\Http\Controllers\Auth\TwoFactorEnableController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\DashboardController;
@@ -17,6 +21,7 @@ use App\Http\Controllers\PixController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurrenceController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
@@ -54,14 +59,49 @@ Route::middleware('guest')->group(function () {
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
         ->name('password.email');
 
-    // The GET form route deliberately does NOT use the `signed`
-    // middleware: the controller does the validity check itself and
-    // bounces the user back to forgot-password with a friendly
-    // error flash (the design's "bad token" UX). The signature on
-    // the URL still gives us a hard 60-minute TTL at the database
-    // level via the token's `expires_at`.
-    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
+// The GET form route deliberately does NOT use the `signed`
+// middleware: the controller does the validity check itself and
+// bounces the user back to forgot-password with a friendly
+// error flash (the design's "bad token" UX). The signature on
+// the URL still gives us a hard 60-minute TTL at the database
+// level via the token's `expires_at`.
+Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
+    ->name('password.reset');
+
+/*
+|--------------------------------------------------------------------------
+| 2FA confirmation GETs + POSTs (FASE 4D / Auth Phase 3)
+|--------------------------------------------------------------------------
+|
+| The two GETs render the confirmation page after the user
+| clicks the email link. The two POSTs finalise the action
+| (enable: 6-digit TOTP code; disable: re-typed password).
+| They live OUTSIDE the `auth` middleware because the user
+| mid-enrollment may be on a different device with no active
+| session. The `signed` middleware validates the temporary
+| signature baked into the URL by `URL::temporarySignedRoute`;
+| without an active signature, Laravel aborts with 403 before
+| the controller runs. The controller does its own
+| token-validity check on top of that for the "expired" /
+| "already used" UX.
+*/
+Route::middleware('signed')->group(function () {
+    Route::get('/two-factor/enable/confirm/{token}', [TwoFactorEnableController::class, 'confirmEnable'])
+        ->name('two-factor.enable.confirm');
+    Route::get('/two-factor/disable/confirm/{token}', [TwoFactorDisableController::class, 'confirmDisable'])
+        ->name('two-factor.disable.confirm');
+});
+
+// The two POST confirmation endpoints (final action) live OUTSIDE
+// the `signed` middleware group on purpose: the `token` field in
+// the POST body is the credential (controller does its own
+// purpose + consumed + expiry check). Putting them in the
+// `signed` group would reject every legitimate POST because the
+// body is not part of the URL signature.
+Route::post('/two-factor/enable/confirm', [TwoFactorEnableController::class, 'confirmEnableStore'])
+    ->name('two-factor.enable.store');
+Route::post('/two-factor/disable/confirm', [TwoFactorDisableController::class, 'confirmDisableStore'])
+    ->name('two-factor.disable.store');
 });
 
 /*
@@ -120,7 +160,42 @@ Route::middleware('auth')->group(function () {
     // has not yet confirmed their address. The three `verification.*`
     // routes and `logout` are exempt and live above.
     Route::middleware('verified')->group(function () {
+        // 2FA challenge (Auth Phase 3). Lives BEFORE the
+        // `two_factor` middleware wrapper so a user who still
+        // has to pass the challenge can reach the form.
+        // The challenge / verify / enable / disable / trusted-
+        // devices routes are all explicitly named (see
+        // EnsureTwoFactorVerified::BYPASS_ROUTE_NAMES) so they
+        // would also bypass via the middleware if the user hit
+        // them through a `two_factor`-wrapped group.
+        Route::get('/two-factor/challenge', [TwoFactorChallengeController::class, 'create'])
+            ->name('two-factor.challenge');
+        Route::post('/two-factor/challenge', [TwoFactorChallengeController::class, 'store'])
+            ->name('two-factor.verify');
+    });
+
+    // Routes that require a verified email AND a passed 2FA
+    // challenge (or a trusted-device cookie). The middleware
+    // exempts the two-factor.* / trusted-devices.* / logout route
+    // names so a user mid-enrollment can still reach the
+    // settings page and the challenge form.
+    Route::middleware(['verified', 'two_factor'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Settings (Auth Phase 3 + future).
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::get('/settings/security', [SettingsController::class, 'security'])
+            ->name('settings.security');
+
+        // 2FA settings (Auth Phase 3).
+        Route::post('/settings/security/two-factor/enable', [TwoFactorEnableController::class, 'beginEnable'])
+            ->name('two-factor.enable.begin');
+        Route::post('/settings/security/two-factor/disable', [TwoFactorDisableController::class, 'beginDisable'])
+            ->name('two-factor.disable.begin');
+        Route::delete('/settings/security/trusted-devices/{id}', [TrustedDeviceController::class, 'destroy'])
+            ->name('trusted-devices.destroy');
+        Route::delete('/settings/security/trusted-devices', [TrustedDeviceController::class, 'destroyAll'])
+            ->name('trusted-devices.destroy-all');
 
         // Accounts
         Route::resource('accounts', AccountController::class);

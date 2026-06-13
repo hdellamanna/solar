@@ -44,6 +44,12 @@ class EmailVerificationToken extends Model
     /** Token issued for the password reset flow. */
     public const PURPOSE_PASSWORD_RESET = 'password_reset';
 
+    /** Token issued to confirm 2FA enrollment (Auth Phase 3). */
+    public const PURPOSE_TWO_FACTOR_ENROLL = 'two_factor_enroll';
+
+    /** Token issued to confirm 2FA disable (Auth Phase 3). */
+    public const PURPOSE_TWO_FACTOR_DISABLE = 'two_factor_disable';
+
     /** @var list<string> */
     protected $fillable = [
         'user_id',
@@ -53,12 +59,14 @@ class EmailVerificationToken extends Model
         'consumed_at',
         'ip_address',
         'user_agent',
+        'meta',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'expires_at' => 'datetime',
         'consumed_at' => 'datetime',
+        'meta' => 'array',
     ];
 
     /**
