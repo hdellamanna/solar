@@ -100,7 +100,7 @@ const isVerificationError = computed(() => {
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
                         <label for="password" class="block text-sm font-semibold">Senha</label>
-                        <a href="#" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Esqueci</a>
+                        <Link :href="route('password.request')" class="text-xs text-primary-600 hover:text-primary-700 font-medium">Esqueci</Link>
                     </div>
                     <input
                         id="password"
