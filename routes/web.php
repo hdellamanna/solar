@@ -69,19 +69,27 @@ Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
 
 /*
 |--------------------------------------------------------------------------
-| 2FA confirmation POSTs (FASE 4D / Auth Phase 3)
+| 2FA confirmation GETs + POSTs (FASE 4D / Auth Phase 3)
 |--------------------------------------------------------------------------
 |
-| The two POST endpoints that take the raw token from the email
-| link and finalise the action (enable: 6-digit TOTP code;
-| disable: re-typed password). They live OUTSIDE the `auth`
-| middleware because the user mid-enrollment may be on a
-| different device with no active session. The signed URL's
-| signature was validated when the user landed on the GET
-| form; we use `signed` here too so the POST cannot be replayed
-| against a leaked URL.
+| The two GETs render the confirmation page after the user
+| clicks the email link. The two POSTs finalise the action
+| (enable: 6-digit TOTP code; disable: re-typed password).
+| They live OUTSIDE the `auth` middleware because the user
+| mid-enrollment may be on a different device with no active
+| session. The `signed` middleware validates the temporary
+| signature baked into the URL by `URL::temporarySignedRoute`;
+| without an active signature, Laravel aborts with 403 before
+| the controller runs. The controller does its own
+| token-validity check on top of that for the "expired" /
+| "already used" UX.
 */
 Route::middleware('signed')->group(function () {
+    Route::get('/two-factor/enable/confirm/{token}', [TwoFactorEnableController::class, 'confirmEnable'])
+        ->name('two-factor.enable.confirm');
+    Route::get('/two-factor/disable/confirm/{token}', [TwoFactorDisableController::class, 'confirmDisable'])
+        ->name('two-factor.disable.confirm');
+
     Route::post('/two-factor/enable/confirm', [TwoFactorEnableController::class, 'confirmEnableStore'])
         ->name('two-factor.enable.store');
     Route::post('/two-factor/disable/confirm', [TwoFactorDisableController::class, 'confirmDisableStore'])
@@ -157,15 +165,6 @@ Route::middleware('auth')->group(function () {
             ->name('two-factor.challenge');
         Route::post('/two-factor/challenge', [TwoFactorChallengeController::class, 'store'])
             ->name('two-factor.verify');
-
-        // Email-confirmed enable / disable confirmation pages
-        // (GET). No `auth` middleware — the user may open these
-        // in a fresh browser. The signed route + the controller's
-        // own token-validity check are the auth.
-        Route::get('/two-factor/enable/confirm/{token}', [TwoFactorEnableController::class, 'confirmEnable'])
-            ->name('two-factor.enable.confirm');
-        Route::get('/two-factor/disable/confirm/{token}', [TwoFactorDisableController::class, 'confirmDisable'])
-            ->name('two-factor.disable.confirm');
     });
 
     // Routes that require a verified email AND a passed 2FA
