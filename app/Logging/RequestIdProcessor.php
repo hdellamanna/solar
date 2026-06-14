@@ -35,7 +35,12 @@ class RequestIdProcessor implements ProcessorInterface
      */
     public function __invoke(LogRecord $record): LogRecord
     {
-        $requestId = Log::sharedContext()->get(self::EXTRA_KEY);
+        // `Log::sharedContext()` returns an `array` in Laravel
+        // 13 (see Illuminate\Log\LogManager::sharedContext —
+        // declared `@return array`). It is NOT a Collection.
+        // Use array access, not `->get()`.
+        $context = Log::sharedContext();
+        $requestId = is_array($context) ? ($context[self::EXTRA_KEY] ?? null) : null;
 
         if (! is_string($requestId) || $requestId === '') {
             // Fallback — if for some reason the middleware
