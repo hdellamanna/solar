@@ -45,42 +45,52 @@ class UserMotionPreference
         return $this->osPrefersReduced($request) ? 'reduced' : 'full';
     }
 
-    /**
+/**
      * Should animations run for the given category?
      *
      * Categories: 'backdrop', 'spring', 'parallax'.
      *
-     * Returns true when:
-     *   - resolvedMotion == 'full'
-     *   - resolvedMotion == 'auto' AND OS does NOT prefer reduced AND the user's per-category flag is on
+     * Resolution hierarchy:
+     *   1. User explicitly chose 'reduced'  → false (user override wins over OS)
+     *   2. User explicitly chose 'full'     → per-category flags apply (OS never overrides)
+     *   3. User is on 'auto' + OS reduced  → false (OS wins in auto mode)
+     *   4. User is on 'auto' + OS full     → per-category flags apply
      *
-     * Returns false when:
-     *   - resolvedMotion == 'reduced'
-     *   - resolvedMotion == 'auto' AND OS prefers reduced (OS wins, per-category flags are irrelevant)
-     *   - resolvedMotion == 'auto' AND OS does NOT prefer reduced AND the user's per-category flag is off
+     * This means a user who sets 'full' can still disable backdrop without
+     * needing to also disable OS motion preferences — the granular flags
+     * always apply unless the user chose 'auto' and OS is reduced.
      */
     public function shouldAnimate(string $category, Request $request): bool
     {
-        $resolved = $this->resolvedMotion($request);
+        // Step 1: an explicit user preference overrides OS signal.
+        if ($this->user !== null) {
+            $pref = $this->user->motion_preference ?? 'auto';
 
-        if ($resolved === 'reduced') {
-            return false;
+            if ($pref === 'reduced') {
+                return false;  // user chose reduced — OS does not override
+            }
+
+            if ($pref === 'full') {
+                // User chose full — per-category flags apply, OS does not bypass them.
+                return match ($category) {
+                    'backdrop'  => (bool) ($this->user->motion_backdrop ?? true),
+                    'spring'    => (bool) ($this->user->motion_spring ?? true),
+                    'parallax'  => (bool) ($this->user->motion_parallax ?? true),
+                    default     => true,
+                };
+            }
         }
 
-        if ($resolved === 'full') {
-            return true;
-        }
-
-        // resolved == 'auto'
+        // Step 2: user is on 'auto' (or is a guest) — OS signal applies.
         if ($this->osPrefersReduced($request)) {
             return false;
         }
 
-        // OS is full; fall through to the user's per-category flag.
+        // OS is not reduced; per-category flags apply.
         return match ($category) {
-            'backdrop'  => (bool) ($this->user->motion_backdrop ?? true),
-            'spring'    => (bool) ($this->user->motion_spring ?? true),
-            'parallax'  => (bool) ($this->user->motion_parallax ?? true),
+            'backdrop'  => (bool) ($this->user?->motion_backdrop ?? true),
+            'spring'    => (bool) ($this->user?->motion_spring ?? true),
+            'parallax'  => (bool) ($this->user?->motion_parallax ?? true),
             default     => true,
         };
     }
@@ -93,28 +103,26 @@ class UserMotionPreference
      */
     public function toInertiaProps(Request $request): array
     {
-        $resolved = $this->resolvedMotion($request);
+        $userPref = $this->user?->motion_preference ?? 'auto';
+        $osReduced = $this->osPrefersReduced($request);
 
-        if ($resolved !== 'auto') {
-            // Explicit user choice overrides everything.
-            $fullOff = $resolved === 'reduced';
-
+        // OS reduced motion always wins — surface 'reduced' so the frontend
+        // knows the effective state even if the user explicitly chose 'full'.
+        if ($osReduced && $userPref !== 'reduced') {
             return [
-                'preference' => $resolved,
-                'backdrop'  => ! $fullOff,
-                'spring'    => ! $fullOff,
-                'parallax'  => ! $fullOff,
+                'preference' => 'reduced',
+                'backdrop'   => false,
+                'spring'     => false,
+                'parallax'   => false,
             ];
         }
 
-        // Auto mode: surface the OS signal + the user's per-category flags.
-        $osReduced = $this->osPrefersReduced($request);
-
+        // User explicitly chose reduced or OS is not reduced.
         return [
-            'preference' => $osReduced ? 'reduced' : 'full',
-            'backdrop'   => ! $osReduced && (bool) ($this->user->motion_backdrop ?? true),
-            'spring'     => ! $osReduced && (bool) ($this->user->motion_spring ?? true),
-            'parallax'   => ! $osReduced && (bool) ($this->user->motion_parallax ?? true),
+            'preference' => $userPref,
+            'backdrop'   => (bool) ($this->user?->motion_backdrop ?? true),
+            'spring'     => (bool) ($this->user?->motion_spring ?? true),
+            'parallax'   => (bool) ($this->user?->motion_parallax ?? true),
         ];
     }
 
