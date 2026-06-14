@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureEmailIsVerified;
 use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\InjectRequestId;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -20,12 +21,33 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         apiPrefix: 'api',
         commands: __DIR__.'/../routes/console.php',
-        health: '/up',
+        // FASE Polish / v0.10.0 — register the bounded health
+        // check in `routes/web.php` as the first route so it
+        // shadows the default Laravel stub. The default stub
+        // returns 200 with no body and a 500 on
+        // `DiagnosingHealth` exceptions; the new controller
+        // returns 200/503 + per-subsystem status.
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Inject the X-Request-Id BEFORE Inertia so the id is
+        // already in Monolog's shared context when the
+        // HandleInertiaRequests middleware runs and so the
+        // shared Inertia props carry the id on the first
+        // render of the page. Also before every other
+        // middleware that might log.
+        $middleware->web(prepend: [
+            InjectRequestId::class,
+        ]);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);
+
+        // 60/min baseline on every API route. Per-endpoint
+        // tighter caps are bound to named limiters in
+        // App\Providers\AppServiceProvider and applied via
+        // `throttle:NAME` in routes/api.php / web.php.
+        $middleware->throttleApi();
 
         // Aliases. The `verified` alias is the Laravel convention and
         // is what `routes/web.php` uses to gate authenticated routes
@@ -52,6 +74,6 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->is('up'),
         );
     })->create();

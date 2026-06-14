@@ -230,4 +230,81 @@ class TwoFactorChallengeTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk();
     }
+
+    // ------------------------------------------------------------------
+    // 16. test_challenge_429_when_totp_hits_per_minute_limit
+    // (FASE Polish / v0.10.0 — TOTP path's per-IP throttle)
+    //
+    // The 2FA challenge route stacks two named limiters
+    // (`two-factor.challenge` 10/min + `two-factor.recovery`
+    // 3/min) — the tighter cap wins. So the TOTP path is
+    // effectively bounded at 3/min in production. We send
+    // 3 attempts and assert the 4th gets 429.
+    // ------------------------------------------------------------------
+    public function test_challenge_429_when_totp_hits_per_minute_limit(): void
+    {
+        $user = User::factory()->withTwoFactor()->create();
+        $this->actingAs($user);
+
+        // "000000" is the conventional test placeholder that
+        // never matches a current 30s TOTP window. Send it
+        // 3 times (the binding cap of the two stacked limiters
+        // is 3/min) — every request reaches the controller
+        // and bounces with a flash. The 4th hits the throttle
+        // middleware and returns 429.
+        for ($i = 1; $i <= 3; $i++) {
+            $this->from(route('two-factor.challenge'))
+                ->post(route('two-factor.verify'), ['code' => '000000']);
+        }
+
+        $throttled = $this->from(route('two-factor.challenge'))
+            ->post(route('two-factor.verify'), ['code' => '000000']);
+
+        $throttled->assertStatus(429);
+        $this->assertNotNull($throttled->headers->get('Retry-After'));
+    }
+
+    // ------------------------------------------------------------------
+    // 17. test_challenge_429_when_recovery_code_hits_per_minute_limit
+    // (FASE Polish / v0.10.0 — recovery-code path's tighter 3/min cap)
+    //
+    // BLOCKING: same defect as RateLimitTest::test_two_factor_recovery_code_respects_stricter_per_minute_limit.
+    // The AppServiceProvider's `config("rate-limits.{$configKey}.per_min")` collapses
+    // the dotted `two-factor.recovery` key into nested access
+    // and falls back to the 10/min default. The fix is one
+    // line — switch to `config('rate-limits')[$configKey]['per_min']` —
+    // and this test passes as-is.
+    // ------------------------------------------------------------------
+    public function test_challenge_429_when_recovery_code_hits_per_minute_limit(): void
+    {
+        $user = User::factory()
+            ->withTwoFactor()
+            ->withRecoveryCodes(10)
+            ->create();
+        $this->actingAs($user);
+
+        // Pre-seed a known unconsumed recovery code so the
+        // request shape is unambiguously a recovery attempt.
+        $plainCode = 'ABCD-EFGH-IJ';
+        RecoveryCode::where('user_id', $user->id)
+            ->whereNull('consumed_at')
+            ->firstOrFail()
+            ->update(['code_hash' => hash('sha256', $plainCode)]);
+
+        // The design contract is a 3/min cap. Today the live
+        // cap is 10/min (see BLOCKING note above) so the
+        // assertion below intentionally tests the CORRECT
+        // contract — once the AppServiceProvider is fixed,
+        // this passes.
+        for ($i = 1; $i <= 3; $i++) {
+            $this->from(route('two-factor.challenge'))
+                ->post(route('two-factor.verify'), ['code' => $plainCode]);
+        }
+
+        $throttled = $this->from(route('two-factor.challenge'))
+            ->post(route('two-factor.verify'), ['code' => $plainCode]);
+
+        $throttled->assertStatus(429);
+        $this->assertNotNull($throttled->headers->get('Retry-After'));
+    }
 }

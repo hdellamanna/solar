@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -29,6 +30,21 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
+| Health check (FASE Polish / v0.10.0)
+|--------------------------------------------------------------------------
+|
+| Bounded health probe for uptime monitors. 200 when every
+| subsystem (database, queue, mail, storage) is green, 503
+| when any probe fails. Registered at the top of the file
+| so it shadows the default Laravel `/up` stub. Lives in
+| the `web` group (session + CSRF + Inertia all run), but
+| the route is GET-only with no auth, so a load balancer
+| can still hit it without credentials.
+*/
+Route::get('/up', HealthController::class)->name('health');
+
+/*
+|--------------------------------------------------------------------------
 | Root redirect
 |--------------------------------------------------------------------------
 */
@@ -47,7 +63,12 @@ Route::get('/', function () {
 */
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
-    Route::post('/login', [LoginController::class, 'store']);
+    // FASE Polish / v0.10.0 — per-IP login throttle (default
+    // 10/min via the `login` named limiter). Credential-
+    // stuffing defence: a real user fat-fingers a few times
+    // and stops, a bot pounds a dictionary and gets 429s.
+    Route::post('/login', [LoginController::class, 'store'])
+        ->middleware('throttle:login');
 
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
     Route::post('/register', [RegisterController::class, 'store']);
@@ -56,8 +77,12 @@ Route::middleware('guest')->group(function () {
     // unauthenticated visitor — can hit these.
     Route::get('/forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
+    // FASE Polish / v0.10.0 — per-IP forgot-password throttle
+    // (default 5/min). Stops an enumeration script from
+    // driving load on the mailer.
     Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->name('password.email');
+        ->name('password.email')
+        ->middleware('throttle:forgot-password');
 
 // The GET form route deliberately does NOT use the `signed`
 // middleware: the controller does the validity check itself and
@@ -120,7 +145,12 @@ Route::post('/two-factor/disable/confirm', [TwoFactorDisableController::class, '
 | service-layer replay check runs.
 */
 Route::post('/reset-password', [NewPasswordController::class, 'store'])
-    ->name('password.update');
+    ->name('password.update')
+    // FASE Polish / v0.10.0 — per-IP reset-password throttle
+    // (default 5/min). Token-based: a leaked token + a
+    // throttled IP can't burn the user's account. Pairs with
+    // the service-layer single-use / 60-minute TTL.
+    ->middleware('throttle:reset-password');
 
 /*
 |--------------------------------------------------------------------------
@@ -152,8 +182,14 @@ Route::middleware('auth')->group(function () {
     // user can open the link in a different browser and still have
     // it work (the controller logs the verified user in).
     Route::get('/email/verify', [VerifyEmailController::class, 'notice'])->name('verification.notice');
+    // FASE Polish / v0.10.0 — per-IP verify-resend throttle
+    // (default 10/min via the `verify` named limiter). The
+    // service-layer `canResend()` already enforces a tighter
+    // 1-per-30s / 5-per-hour budget per user; this is the
+    // IP-level backstop for scripted abuse.
     Route::post('/email/verify/resend', [ResendVerificationController::class, 'store'])
-        ->name('verification.resend');
+        ->name('verification.resend')
+        ->middleware('throttle:verify');
 
     // Everything below requires a verified email. The `verified`
     // middleware redirects to the verification notice when the user
@@ -170,8 +206,18 @@ Route::middleware('auth')->group(function () {
         // them through a `two_factor`-wrapped group.
         Route::get('/two-factor/challenge', [TwoFactorChallengeController::class, 'create'])
             ->name('two-factor.challenge');
+        // FASE Polish / v0.10.0 — per-IP 2FA challenge
+        // throttle. The TOTP path is the typical case
+        // (10/min); the recovery-code path is the weaker of
+        // the two and gets a tighter cap (3/min). Both
+        // throttles are stacked on the route — the IP-level
+        // cap that fires first wins. The controller also
+        // keeps its own per-user counter so a real user
+        // hopping IPs can't outpace the per-user budget.
         Route::post('/two-factor/challenge', [TwoFactorChallengeController::class, 'store'])
-            ->name('two-factor.verify');
+            ->name('two-factor.verify')
+            ->middleware('throttle:two-factor.challenge')
+            ->middleware('throttle:two-factor.recovery');
     });
 
     // Routes that require a verified email AND a passed 2FA

@@ -1,5 +1,7 @@
 <?php
 
+use App\Logging\RequestIdProcessor;
+use Monolog\Formatter\JsonFormatter;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -56,6 +58,26 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+        ],
+
+        // FASE Polish / v0.10.0 — JSON-line structured channel
+        // for ingestion into log aggregators (Datadog, Loki,
+        // CloudWatch, etc). Kept SEPARATE from `single` so
+        // existing log readers / `php artisan pail` keep
+        // working — operators opt in by adding
+        // `LOG_STACK=single,structured` in their env.
+        'structured' => [
+            'driver' => 'monolog',
+            'level' => env('LOG_LEVEL', 'debug'),
+            'handler' => StreamHandler::class,
+            'with' => [
+                'stream' => storage_path('logs/structured.log'),
+            ],
+            'formatter' => JsonFormatter::class,
+            'processors' => [
+                PsrLogMessageProcessor::class,
+                RequestIdProcessor::class,
+            ],
         ],
 
         'single' => [

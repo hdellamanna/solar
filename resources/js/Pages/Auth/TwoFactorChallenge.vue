@@ -1,6 +1,6 @@
 <script setup>
 /*
- * Two-Factor challenge (FASE 4D / Auth Phase 3).
+ * Two-Factor challenge (FASE 4D / Auth Phase 3 + FASE Polish / v0.10.0).
  *
  * Rendered for an already-authenticated + email-verified user whose
  * `two_factor_verified` session flag is still false. The user
@@ -14,9 +14,20 @@
  * it tries TOTP first (digits only, length 6) and falls back to
  * a recovery code (anything else, 8–10 chars). The single `code`
  * field covers both paths.
+ *
+ * FASE Polish UX:
+ *  - Trust checkbox moved ABOVE the code input (less "friction"
+ *    hidden at the bottom). The label is now the full
+ *    "Confiar neste dispositivo por 90 dias" copy.
+ *  - A "post-challenge" success toast auto-dismisses after 3s;
+ *    a small "Verificacao concluida" banner appears at the top
+ *    of the page for screen readers.
+ *  - The card uses `card-glass` so the mesh canvas behind the
+ *    page (rendered by AuthenticatedLayout) shows through the
+ *    rounded edges.
  */
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
@@ -25,6 +36,7 @@ const props = defineProps({
 
 const page = usePage();
 const flashError = computed(() => page.props.flash?.error ?? null);
+const flashSuccess = computed(() => page.props.flash?.success ?? null);
 const fieldError = computed(() => form.errors?.code ?? null);
 
 const form = useForm({
@@ -39,6 +51,18 @@ const codeInput = ref(null);
 // `tel` (numeric, autocomplete=one-time-code) to `text` so dashes
 // and alphanumerics go through.
 const useRecoveryCode = ref(false);
+
+// FASE Polish — auto-dismiss the success toast after 3s. We only
+// hide it visually; the flash lives in the session until the next
+// request so reloading still shows it. This is a UX nicety, not
+// a security gate.
+const showSuccess = ref(false);
+onMounted(() => {
+    if (flashSuccess.value) {
+        showSuccess.value = true;
+        setTimeout(() => { showSuccess.value = false; }, 3000);
+    }
+});
 
 const submit = () => {
     form.post(route('two-factor.verify'), {
@@ -69,7 +93,7 @@ const onModeSwap = (recovery) => {
 <template>
     <Head title="Verificacao em duas etapas · Solar Money" />
     <AuthenticatedLayout title="Verificacao em duas etapas">
-        <div class="max-w-md mx-auto space-y-6">
+        <div class="max-w-md mx-auto space-y-6 relative z-10">
             <!-- Shield icon -->
             <div class="flex justify-center">
                 <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-solar-500 to-solar-600
@@ -91,6 +115,45 @@ const onModeSwap = (recovery) => {
                     autenticador ou um dos codigos de recuperacao.
                 </p>
             </div>
+
+            <!--
+                FASE Polish — prominent success toast on the
+                post-challenge redirect. The backend's controller
+                flashes `success: "Verificacao concluida."`; we
+                surface it in a 3s auto-dismiss banner so the
+                user has visual confirmation the challenge was
+                actually passed (vs. silently redirecting).
+            -->
+            <Transition
+                enter-active-class="transition duration-300 ease-spring"
+                enter-from-class="opacity-0 -translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-200"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0">
+                <div v-if="flashSuccess && showSuccess"
+                     class="p-3.5 rounded-2xl card-glass
+                            bg-emerald-50/80 dark:bg-emerald-500/10
+                            border border-emerald-200/70 dark:border-emerald-500/30
+                            text-sm text-emerald-700 dark:text-emerald-300 flex items-start gap-2.5"
+                     role="status">
+                    <svg class="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="flex-1">{{ flashSuccess }}</span>
+                    <button
+                        type="button"
+                        @click="showSuccess = false"
+                        class="text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-900 dark:hover:text-emerald-100
+                               transition-colors"
+                        aria-label="Fechar"
+                    >
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </Transition>
 
             <!--
                 Banners (errors). The middleware bouncer flash lands
@@ -119,6 +182,36 @@ const onModeSwap = (recovery) => {
             </Transition>
 
             <form @submit.prevent="submit" class="card p-6 space-y-5">
+                <!--
+                    FASE Polish — "Trust this device" checkbox
+                    moved ABOVE the code input with a clearer
+                    label and a short helper line. Default is
+                    `true` so a user on their own device just
+                    confirms the code and the cookie is minted
+                    without extra clicks.
+                -->
+                <label class="flex items-start gap-3 cursor-pointer select-none
+                              p-3.5 rounded-2xl
+                              bg-primary-50/50 dark:bg-primary-500/5
+                              border border-primary-200/50 dark:border-primary-500/20
+                              transition-colors hover:bg-primary-50/70 dark:hover:bg-primary-500/10">
+                    <input
+                        v-model="form.trust_device"
+                        type="checkbox"
+                        class="mt-0.5 w-4 h-4 rounded text-primary-600 border-ink-300
+                               focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 cursor-pointer"
+                    >
+                    <span class="flex-1 min-w-0">
+                        <span class="block text-sm font-semibold text-ink-900 dark:text-ink-50">
+                            Confiar neste dispositivo por 90 dias
+                        </span>
+                        <span class="block text-xs text-ink-500 dark:text-ink-400 mt-0.5 leading-snug">
+                            Nao pediremos o codigo 2FA novamente neste
+                            navegador ate o cookie expirar.
+                        </span>
+                    </span>
+                </label>
+
                 <!-- Tab-style switch between TOTP and recovery code.
                      The input is the same `code` field; only the
                      type / autocomplete / placeholder differ. -->
@@ -172,18 +265,6 @@ const onModeSwap = (recovery) => {
                         {{ fieldError }}
                     </p>
                 </div>
-
-                <label class="flex items-center gap-2.5 text-sm cursor-pointer select-none pt-1">
-                    <input
-                        v-model="form.trust_device"
-                        type="checkbox"
-                        class="w-4 h-4 rounded text-primary-600 border-ink-300
-                               focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 cursor-pointer"
-                    >
-                    <span class="text-ink-600 dark:text-ink-300">
-                        Confiar neste dispositivo por 90 dias
-                    </span>
-                </label>
 
                 <button
                     type="submit"

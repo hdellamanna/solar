@@ -55,6 +55,15 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
+            // FASE Polish / v0.10.0 — request id (the
+            // `req_` + 32-hex shape) is read off the request
+            // attributes stashed by
+            // {@see \App\Http\Middleware\InjectRequestId}.
+            // Surfaced on the front-end so a user hitting
+            // "Enviar log de erro" can paste the id into a
+            // support ticket and we can grep the JSON log
+            // channel for the exact request lifecycle.
+            'requestId' => fn () => $request->attributes->get('request_id'),
         ];
     }
 

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\URL;
 /**
  * Email-confirmed half of the 2FA flow (Auth Phase 3).
  *
+ * Thin adapter over {@see BearerTokenService} (FASE Polish / v0.10.0).
  * The live challenge (TOTP code or recovery code at login) is
  * handled by the challenge controller; this service owns the
  * enable / disable flows, both of which are gated by a 60-min
@@ -29,6 +30,14 @@ use Illuminate\Support\Facades\URL;
  * {@see EmailVerificationToken::hashToken()} and
  * {@see EmailVerificationToken::scopeForPurpose()} helpers — does
  * NOT roll its own hash/lookup logic.
+ *
+ * The `confirmEnable` and `confirmDisable` methods own the
+ * post-consume action (encrypting the TOTP secret, minting the
+ * recovery codes, wiping the recovery codes on disable, etc.).
+ * Those actions run inside the handler closure passed to
+ * {@see BearerTokenService::consume()}, so they execute AFTER
+ * the token has been marked consumed — same race-window trade-off
+ * the pre-refactor implementation had.
  */
 class TwoFactorEnrollmentService
 {
@@ -41,6 +50,8 @@ class TwoFactorEnrollmentService
     /** Length of each recovery code, in characters. */
     public const RECOVERY_CODE_LENGTH = 10;
 
+    public function __construct(private BearerTokenService $tokens) {}
+
     /**
      * Stage 1 of enable: mint a `two_factor_enroll` token, email
      * the user a link to the confirm page. The link is a
@@ -49,23 +60,23 @@ class TwoFactorEnrollmentService
      */
     public function beginEnable(User $user, ?string $ip = null, ?string $ua = null): string
     {
-        ['token' => $raw] = EmailVerificationToken::generateForUser(
+        $minted = $this->tokens->mint(
             $user,
+            EmailVerificationToken::PURPOSE_TWO_FACTOR_ENROLL,
             null,
             $ip,
             $ua,
-            EmailVerificationToken::PURPOSE_TWO_FACTOR_ENROLL,
         );
 
         $url = URL::temporarySignedRoute(
             'two-factor.enable.confirm',
-            now()->addMinutes(self::TOKEN_TTL_MINUTES),
-            ['token' => $raw],
+            $minted['row']->expires_at,
+            ['token' => $minted['raw']],
         );
 
         Mail::to($user->email)->send(new TwoFactorEnableMail($user, $url));
 
-        return $raw;
+        return $minted['raw'];
     }
 
     /**
@@ -88,54 +99,60 @@ class TwoFactorEnrollmentService
      */
     public function confirmEnable(string $rawToken, string $totpCode, TwoFactorService $tf): User
     {
-        $token = $this->consumeToken($rawToken, EmailVerificationToken::PURPOSE_TWO_FACTOR_ENROLL);
+        try {
+            $user = $this->tokens->consume(
+                $rawToken,
+                EmailVerificationToken::PURPOSE_TWO_FACTOR_ENROLL,
+                function (EmailVerificationToken $token, User $user) use ($totpCode, $tf): User {
+                    $meta = $token->meta ?? [];
+                    $encryptedSecret = $meta['pending_secret_encrypted'] ?? null;
+                    if (! is_string($encryptedSecret) || $encryptedSecret === '') {
+                        // The GET page was never rendered (or the
+                        // secret was wiped by a re-issue), so
+                        // there is no secret to verify against.
+                        throw new InvalidTwoFactorTokenException('Sessao de ativacao expirada. Solicite um novo link.');
+                    }
 
-        $user = $token->user;
-        if ($user === null) {
-            throw new InvalidTwoFactorTokenException('Usuário associado ao token não existe mais.');
-        }
+                    $newCounter = null;
+                    if (! $tf->verifyCode($encryptedSecret, $totpCode, $newCounter, 0)) {
+                        throw new InvalidTwoFactorTokenException('Codigo 2FA invalido. Tente novamente.');
+                    }
 
-        $meta = $token->meta ?? [];
-        $encryptedSecret = $meta['pending_secret_encrypted'] ?? null;
-        if (! is_string($encryptedSecret) || $encryptedSecret === '') {
-            // The GET page was never rendered (or the secret
-            // was wiped by a re-issue), so there is no secret
-            // to verify against.
-            throw new InvalidTwoFactorTokenException('Sessao de ativacao expirada. Solicite um novo link.');
-        }
+                    DB::transaction(function () use ($user, $encryptedSecret, $newCounter) {
+                        // Replace any prior row (e.g. a partial
+                        // enable that left a record) — there is a
+                        // unique index on user_id, so we upsert.
+                        UserTwoFactor::updateOrCreate(
+                            ['user_id' => $user->id],
+                            [
+                                'secret_encrypted' => $encryptedSecret,
+                                'last_counter' => $newCounter ?? 0,
+                                'enabled_at' => now(),
+                                'confirmed_at' => null,
+                            ],
+                        );
 
-        $newCounter = null;
-        if (! $tf->verifyCode($encryptedSecret, $totpCode, $newCounter, 0)) {
-            throw new InvalidTwoFactorTokenException('Codigo 2FA invalido. Tente novamente.');
-        }
+                        // Wipe any prior recovery codes (fresh
+                        // codes for the fresh secret) and mint 10
+                        // new ones.
+                        RecoveryCode::where('user_id', $user->id)->delete();
 
-        DB::transaction(function () use ($user, $encryptedSecret, $newCounter) {
-            // Replace any prior row (e.g. a partial enable that
-            // left a record) — there is a unique index on
-            // user_id, so we upsert.
-            UserTwoFactor::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'secret_encrypted' => $encryptedSecret,
-                    'last_counter' => $newCounter ?? 0,
-                    'enabled_at' => now(),
-                    'confirmed_at' => null,
-                ],
+                        for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
+                            RecoveryCode::create([
+                                'user_id' => $user->id,
+                                'code_hash' => $this->hashRecoveryCode($this->generateRecoveryCode()),
+                            ]);
+                        }
+                    });
+
+                    return $user->fresh(['twoFactor', 'recoveryCodes']);
+                },
             );
+        } catch (InvalidTokenException $e) {
+            throw new InvalidTwoFactorTokenException($this->translate($e));
+        }
 
-            // Wipe any prior recovery codes (fresh codes for the
-            // fresh secret) and mint 10 new ones.
-            RecoveryCode::where('user_id', $user->id)->delete();
-
-            for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
-                RecoveryCode::create([
-                    'user_id' => $user->id,
-                    'code_hash' => $this->hashRecoveryCode($this->generateRecoveryCode()),
-                ]);
-            }
-        });
-
-        return $user->fresh(['twoFactor', 'recoveryCodes']);
+        return $user;
     }
 
     /**
@@ -153,23 +170,23 @@ class TwoFactorEnrollmentService
             throw new InvalidTwoFactorTokenException('Senha incorreta.');
         }
 
-        ['token' => $raw] = EmailVerificationToken::generateForUser(
+        $minted = $this->tokens->mint(
             $user,
+            EmailVerificationToken::PURPOSE_TWO_FACTOR_DISABLE,
             null,
             $ip,
             $ua,
-            EmailVerificationToken::PURPOSE_TWO_FACTOR_DISABLE,
         );
 
         $url = URL::temporarySignedRoute(
             'two-factor.disable.confirm',
-            now()->addMinutes(self::TOKEN_TTL_MINUTES),
-            ['token' => $raw],
+            $minted['row']->expires_at,
+            ['token' => $minted['raw']],
         );
 
         Mail::to($user->email)->send(new TwoFactorDisableMail($user, $url));
 
-        return $raw;
+        return $minted['raw'];
     }
 
     /**
@@ -183,28 +200,35 @@ class TwoFactorEnrollmentService
      */
     public function confirmDisable(string $rawToken, string $password): User
     {
-        $token = $this->consumeToken($rawToken, EmailVerificationToken::PURPOSE_TWO_FACTOR_DISABLE);
+        try {
+            $user = $this->tokens->consume(
+                $rawToken,
+                EmailVerificationToken::PURPOSE_TWO_FACTOR_DISABLE,
+                function (EmailVerificationToken $token, User $user) use ($password): User {
+                    if (! Hash::check($password, $user->password)) {
+                        // The token has already been consumed, so
+                        // the user will need to start the disable
+                        // flow over. This is a deliberate
+                        // trade-off — we do not want a wrong
+                        // password to leave a window for brute
+                        // force.
+                        throw new InvalidTwoFactorTokenException('Senha incorreta.');
+                    }
 
-        $user = $token->user;
-        if ($user === null) {
-            throw new InvalidTwoFactorTokenException('Usuário associado ao token não existe mais.');
+                    DB::transaction(function () use ($user) {
+                        UserTwoFactor::where('user_id', $user->id)->delete();
+                        RecoveryCode::where('user_id', $user->id)->delete();
+                        TrustedDevice::where('user_id', $user->id)->delete();
+                    });
+
+                    return $user->fresh();
+                },
+            );
+        } catch (InvalidTokenException $e) {
+            throw new InvalidTwoFactorTokenException($this->translate($e));
         }
 
-        if (! Hash::check($password, $user->password)) {
-            // The token has already been consumed, so the user
-            // will need to start the disable flow over. This is
-            // a deliberate trade-off — we do not want a wrong
-            // password to leave a window for brute force.
-            throw new InvalidTwoFactorTokenException('Senha incorreta.');
-        }
-
-        DB::transaction(function () use ($user) {
-            UserTwoFactor::where('user_id', $user->id)->delete();
-            RecoveryCode::where('user_id', $user->id)->delete();
-            TrustedDevice::where('user_id', $user->id)->delete();
-        });
-
-        return $user->fresh();
+        return $user;
     }
 
     /**
@@ -236,40 +260,19 @@ class TwoFactorEnrollmentService
     }
 
     /**
-     * Mark a token consumed and return the model — extracted so
-     * the two `confirmX` paths share the not-found / already-used
-     * / expired branching.
-     *
-     * @throws InvalidTwoFactorTokenException
+     * Translate the generic English {@see InvalidTokenException}
+     * message into the pt-BR string the existing controllers
+     * surface to the user. The shape is identical to the
+     * pre-refactor implementation so the controller error flashes
+     * keep working without modification.
      */
-    private function consumeToken(string $rawToken, string $purpose): EmailVerificationToken
+    private function translate(InvalidTokenException $e): string
     {
-        $hash = EmailVerificationToken::hashToken($rawToken);
-
-        /** @var EmailVerificationToken|null $token */
-        $token = EmailVerificationToken::query()
-            ->forPurpose($purpose)
-            ->where('token_hash', $hash)
-            ->first();
-
-        if ($token === null) {
-            throw new InvalidTwoFactorTokenException('Link inválido ou expirado.');
-        }
-
-        if ($token->consumed_at !== null) {
-            throw new InvalidTwoFactorTokenException('Este link já foi utilizado.');
-        }
-
-        if (! $token->expires_at || $token->expires_at->isPast()) {
-            throw new InvalidTwoFactorTokenException('Este link expirou. Solicite um novo.');
-        }
-
-        // Mark consumed before mutating the user. If two
-        // requests race, the second one will fail the
-        // `consumed_at` check on its re-fetch.
-        $token->consumed_at = now();
-        $token->save();
-
-        return $token;
+        return match ($e->getMessage()) {
+            'Token not found.' => 'Link inválido ou expirado.',
+            'Token already consumed.' => 'Este link já foi utilizado.',
+            'Token expired.' => 'Este link expirou. Solicite um novo.',
+            default => 'Este link não pode ser utilizado. Solicite um novo.',
+        };
     }
 }

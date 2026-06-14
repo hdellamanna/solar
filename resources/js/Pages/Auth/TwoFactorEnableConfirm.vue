@@ -84,6 +84,37 @@ const copySecret = async () => {
     <Head title="Ativar 2FA · Solar Money" />
     <GuestLayout>
         <div>
+            <!--
+                FASE Polish / v0.10.0 — step indicator at the top
+                of the page. The enable flow is intentionally
+                split into 2 sub-steps:
+                  1) click the email link  (already done — we're
+                     on this page, so dot 1 is "complete")
+                  2) confirm the TOTP code (the current step)
+                The "Etapa 2 de 2" copy makes the user feel
+                they're 50% of the way through, not staring at
+                a 4-paragraph configuration guide.
+            -->
+            <div class="flex items-center justify-center gap-2 mb-6">
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full
+                            bg-emerald-50/80 dark:bg-emerald-500/10
+                            border border-emerald-200/70 dark:border-emerald-500/30
+                            text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Link do email confirmado</span>
+                </div>
+                <span class="text-ink-300 dark:text-ink-600" aria-hidden="true">/</span>
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full
+                            bg-primary-50 dark:bg-primary-500/10
+                            border border-primary-200/70 dark:border-primary-500/30
+                            text-[11px] font-semibold text-primary-700 dark:text-primary-300">
+                    <span class="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" aria-hidden="true"></span>
+                    <span>Etapa 2 de 2: confirme o codigo</span>
+                </div>
+            </div>
+
             <!-- Brand-mark shield icon — same family as the other auth pages. -->
             <div class="flex justify-center mb-6">
                 <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-solar-500 to-solar-600
@@ -99,11 +130,12 @@ const copySecret = async () => {
             </div>
 
             <div class="text-center">
-                <h1 class="font-display text-display-sm tracking-tight">Ative a verificacao em duas etapas</h1>
+                <h1 class="font-display text-display-sm tracking-tight">Confirme a ativacao da verificacao em duas etapas</h1>
                 <p class="text-sm text-ink-500 dark:text-ink-400 mt-3 leading-relaxed">
                     Escaneie o QR code com seu app autenticador
-                    (Google Authenticator, 1Password, Authy) e confirme
-                    com o codigo de 6 digitos gerado.
+                    (Google Authenticator, 1Password, Authy) e
+                    digite o codigo de 6 digitos gerado para
+                    finalizar a ativacao.
                 </p>
             </div>
 

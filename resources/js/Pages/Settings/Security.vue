@@ -1,11 +1,16 @@
 <script setup>
 /*
- * Settings — Security (FASE 4D / Auth Phase 3).
+ * Settings — Security (FASE 4D / Auth Phase 3 + FASE Polish / v0.10.0).
  *
  * The single home for 2FA + trusted-device management. Three sections:
  *
- *  1. 2FA status — badge + Enable / Disable buttons (the latter gated
- *     behind a password re-prompt that opens an inline confirm panel).
+ *  1. 2FA status — status pill + Enable / Disable buttons (the latter
+ *     gated behind a password re-prompt that opens an inline confirm
+ *     panel). FASE Polish adds a green "Ativado" / amber "Desativado"
+ *     pill, a "Última verificação: há X minutos" line when active, and
+ *     a recovery-code count "X de 10 códigos restantes" (with a
+ *     placeholder for a "Regenerar códigos" action that ships in
+ *     v0.11+).
  *  2. Recovery codes hint — a one-liner pointing at how to see them
  *     (they are only shown at enrollment, so this is mostly an
  *     informational row when 2FA is on).
@@ -29,12 +34,40 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 const props = defineProps({
     twoFactorEnabled: { type: Boolean, required: true },
     enabledAt: { type: String, default: null },
+    lastVerifiedAt: { type: String, default: null },
+    recoveryCodesRemaining: { type: Number, default: 0 },
+    recoveryCodesTotal: { type: Number, default: 10 },
     trustedDevices: { type: Array, default: () => [] },
+    // True when the user has clicked "Desativar 2FA" but hasn't yet
+    // clicked the email link — drives a red "Desativando..." pill.
+    disablePending: { type: Boolean, default: false },
 });
 
 const page = usePage();
 const flashSuccess = computed(() => page.props.flash?.success ?? null);
 const flashError = computed(() => page.props.flash?.error ?? null);
+
+// Relative-time formatter (pt-BR) — e.g. "há 2 minutos" / "há 3 dias".
+// Re-uses Intl.RelativeTimeFormat so the value tracks the user's locale
+// without us hard-coding every plural form.
+const relativeTime = (iso) => {
+    if (! iso) return null;
+    const then = new Date(iso).getTime();
+    if (! Number.isFinite(then)) return null;
+    const diffSec = Math.round((Date.now() - then) / 1000);
+    const absSec = Math.abs(diffSec);
+    const fmt = new Intl.RelativeTimeFormat('pt-BR', { numeric: 'auto' });
+    if (absSec < 60) return fmt.format(-diffSec, 'second');
+    if (absSec < 3600) return fmt.format(-Math.round(diffSec / 60), 'minute');
+    if (absSec < 86400) return fmt.format(-Math.round(diffSec / 3600), 'hour');
+    if (absSec < 86400 * 30) return fmt.format(-Math.round(diffSec / 86400), 'day');
+    if (absSec < 86400 * 365) return fmt.format(-Math.round(diffSec / (86400 * 30)), 'month');
+    return fmt.format(-Math.round(diffSec / (86400 * 365)), 'year');
+};
+const lastVerifiedLabel = computed(() => {
+    const label = relativeTime(props.lastVerifiedAt);
+    return label ? `Última verificação: ${label}` : null;
+});
 
 // ─── 2FA Enable ──────────────────────────────────────────────────────
 // POST /two-factor/enable/begin. The backend mints a one-time email
@@ -190,26 +223,40 @@ const formatDateTime = (iso) => {
                             <h2 class="font-display text-lg font-semibold">
                                 Verificacao em duas etapas
                             </h2>
+                            <!--
+                                FASE Polish / v0.10.0 — unified status
+                                pill. 3 visual variants (.status-pill--ok
+                                / --warn / --err) for the three states
+                                a 2FA status can be in. The `err`
+                                variant is the "Desativando..." state
+                                when the user has clicked the email
+                                link but the disable is still mid-flight.
+                            -->
                             <span
                                 v-if="twoFactorEnabled"
-                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-                                       text-[11px] font-semibold
-                                       bg-emerald-50 dark:bg-emerald-500/10
-                                       text-emerald-700 dark:text-emerald-300
-                                       border border-emerald-200/70 dark:border-emerald-500/30"
+                                class="status-pill status-pill--ok"
+                                role="status"
+                                aria-label="Verificacao em duas etapas ativa"
                             >
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                Ativa
+                                <span class="status-pill__dot" aria-hidden="true"></span>
+                                Ativada
+                            </span>
+                            <span
+                                v-else-if="disablePending"
+                                class="status-pill status-pill--err"
+                                role="status"
+                                aria-label="Desativacao em andamento"
+                            >
+                                <span class="status-pill__dot animate-pulse" aria-hidden="true"></span>
+                                Desativando...
                             </span>
                             <span
                                 v-else
-                                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
-                                       text-[11px] font-semibold
-                                       bg-ink-100 dark:bg-ink-800/60
-                                       text-ink-600 dark:text-ink-300
-                                       border border-ink-200/70 dark:border-ink-700"
+                                class="status-pill status-pill--warn"
+                                role="status"
+                                aria-label="Verificacao em duas etapas desativada"
                             >
-                                <span class="w-1.5 h-1.5 rounded-full bg-ink-400"></span>
+                                <span class="status-pill__dot" aria-hidden="true"></span>
                                 Desativada
                             </span>
                         </div>
@@ -217,6 +264,9 @@ const formatDateTime = (iso) => {
                         <p class="text-sm text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">
                             <template v-if="twoFactorEnabled">
                                 Ativada em <strong>{{ formatDateTime(enabledAt) }}</strong>.
+                                <span v-if="lastVerifiedLabel" class="block">
+                                    {{ lastVerifiedLabel }}.
+                                </span>
                                 Para confirmar o codigo, use seu app autenticador
                                 (Google Authenticator, 1Password, Authy).
                             </template>
@@ -327,6 +377,71 @@ const formatDateTime = (iso) => {
                         </form>
                     </div>
                 </div>
+            </section>
+
+            <!-- ─── Recovery codes (FASE Polish / v0.10.0) ──────────────
+                 Only shown when 2FA is on. Lists how many of the
+                 original 10 codes are still unconsumed and offers
+                 a "Regenerar códigos" placeholder (the actual
+                 endpoint ships in v0.11+; for v0.10.0 we just
+                 show the button so the UI surface is locked in).
+            -->
+            <section v-if="twoFactorEnabled" class="card p-6 space-y-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-11 h-11 rounded-xl grid place-items-center shrink-0
+                                bg-gradient-to-br from-amber-500 to-amber-700 text-white shadow-soft">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7l4 4-4 4M7 17h14M21 7l-4 4 4 4" />
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h2 class="font-display text-lg font-semibold">Codigos de recuperacao</h2>
+                        <p class="text-sm text-ink-500 dark:text-ink-400 mt-1 leading-relaxed">
+                            Use um dos codigos abaixo caso perca o acesso
+                            ao seu app autenticador. Cada codigo so
+                            funciona uma vez.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 p-4 rounded-2xl
+                            bg-ink-100/60 dark:bg-ink-800/40
+                            border border-ink-200/70 dark:border-ink-700/70">
+                    <p class="text-sm font-semibold">
+                        <span class="num">{{ recoveryCodesRemaining }}</span>
+                        de
+                        <span class="num">{{ recoveryCodesTotal }}</span>
+                        codigos restantes
+                    </p>
+                    <span
+                        v-if="recoveryCodesRemaining < 3"
+                        class="status-pill status-pill--warn"
+                        role="status"
+                    >
+                        <span class="status-pill__dot" aria-hidden="true"></span>
+                        Baixo
+                    </span>
+                </div>
+
+                <!--
+                    Out of scope for v0.10.0: the regeneration
+                    endpoint. We render the button but it is
+                    disabled with a tooltip so the user sees the
+                    surface even though clicking does nothing.
+                -->
+                <button
+                    type="button"
+                    disabled
+                    class="btn-ghost text-sm cursor-not-allowed opacity-60"
+                    title="Disponivel na proxima versao (v0.11+)"
+                >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2" />
+                    </svg>
+                    Regenerar codigos
+                </button>
             </section>
 
             <!-- ─── Trusted devices ────────────────────────────────────── -->

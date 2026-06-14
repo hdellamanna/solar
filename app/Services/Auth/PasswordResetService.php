@@ -5,7 +5,6 @@ namespace App\Services\Auth;
 use App\Mail\PasswordResetMail;
 use App\Models\EmailVerificationToken;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -14,22 +13,29 @@ use Illuminate\Support\Facades\URL;
 /**
  * Orchestrates the password-reset flow (FASE 4D / Auth Phase 2).
  *
- * Mirrors {@see EmailVerificationService} in shape but keeps a
- * separate state machine so the two flows can evolve independently.
- * Cross-cutting helpers (hashing, throttling) are duplicated as
- * private methods so neither service has a hard dependency on the
- * other.
+ * Thin adapter over {@see BearerTokenService} (FASE Polish / v0.10.0).
+ * The legacy implementation used to own the mint / consume / throttle
+ * dance end-to-end; that logic now lives in the bearer service. The
+ * adapter is responsible only for:
  *
- * Responsibilities:
- *  - Mint and persist a single-use password-reset token (the raw
- *    value is embedded in the email; only the SHA-256 hash lives in
- *    the database).
- *  - Enforce the 30-second cooldown / 5-per-hour cap on the
- *    application cache (the `password-reset:*` namespace).
- *  - Resolve a raw token to its user, mark it consumed, and rotate
- *    the password (invalidating remember-me cookies along the way).
- *  - Silently no-op when the requested email does not exist so the
- *    UI cannot be used to enumerate accounts.
+ *  - choosing the right `purpose` value;
+ *  - building the signed reset URL via `URL::temporarySignedRoute`;
+ *  - handing the email to the mailer;
+ *  - silently no-op'ing when the requested email does not exist
+ *    (anti-enumeration);
+ *  - hashing the new password, rotating the remember-token, and
+ *    invalidating sibling reset tokens on successful consume;
+ *  - surfacing pt-BR error messages that match the existing
+ *    controllers' flash text.
+ *
+ * Throttle keys are `password-reset:throttle:{emailHash}:{last_sent,
+ * hourly_count}` (the shape the existing 261 tests poke directly).
+ *
+ * Public surface is identical to the pre-refactor implementation:
+ *
+ *  - `requestReset(string $email, ?ip, ?ua): bool`
+ *  - `resetPassword(string $raw, string $new): User`
+ *  - `canRequestReset(string $email): bool`
  */
 class PasswordResetService
 {
@@ -37,10 +43,12 @@ class PasswordResetService
     public const TTL_MINUTES = 60;
 
     /** Minimum seconds between two consecutive reset emails to the same address. */
-    public const RESEND_COOLDOWN_SECONDS = 30;
+    public const RESEND_COOLDOWN_SECONDS = BearerTokenService::RESEND_COOLDOWN_SECONDS;
 
     /** Maximum number of reset emails allowed within the rolling one-hour window. */
-    public const RESEND_HOURLY_CAP = 5;
+    public const RESEND_HOURLY_CAP = BearerTokenService::RESEND_HOURLY_CAP;
+
+    public function __construct(private BearerTokenService $tokens) {}
 
     /**
      * Issue a fresh token, persist it, and email the reset link.
@@ -68,23 +76,25 @@ class PasswordResetService
             return true;
         }
 
-        ['token' => $raw] = EmailVerificationToken::generateForUser(
+        $minted = $this->tokens->mint(
             $user,
+            EmailVerificationToken::PURPOSE_PASSWORD_RESET,
             null,
             $ip,
             $ua,
-            EmailVerificationToken::PURPOSE_PASSWORD_RESET,
         );
 
         $url = URL::temporarySignedRoute(
             'password.reset',
-            now()->addMinutes(self::TTL_MINUTES),
-            ['token' => $raw],
+            $minted['row']->expires_at,
+            ['token' => $minted['raw']],
         );
 
         Mail::to($user->email)->send(new PasswordResetMail($user, $url));
 
-        $this->bumpThrottle($email);
+        $this->tokens->bumpResendCounter(
+            $this->tokens->resendThrottleKey($email, EmailVerificationToken::PURPOSE_PASSWORD_RESET),
+        );
 
         return true;
     }
@@ -99,52 +109,35 @@ class PasswordResetService
      */
     public function resetPassword(string $rawToken, string $newPassword): User
     {
-        $hash = EmailVerificationToken::hashToken($rawToken);
+        try {
+            $user = $this->tokens->consume(
+                $rawToken,
+                EmailVerificationToken::PURPOSE_PASSWORD_RESET,
+                function (EmailVerificationToken $token, User $user) use ($newPassword): User {
+                    $user->password = Hash::make($newPassword);
+                    // Rotating the remember token invalidates any
+                    // "remember me" cookie an attacker might have
+                    // captured before the reset.
+                    $user->setRememberToken(Str::random(60));
+                    $user->save();
 
-        /** @var EmailVerificationToken|null $token */
-        $token = EmailVerificationToken::query()
-            ->forPurpose(EmailVerificationToken::PURPOSE_PASSWORD_RESET)
-            ->where('token_hash', $hash)
-            ->first();
+                    // Invalidate every other active reset token for
+                    // this user — a successful reset should kill the
+                    // entire family of pending links so a leaked
+                    // inbox link can't be used later.
+                    EmailVerificationToken::query()
+                        ->forPurpose(EmailVerificationToken::PURPOSE_PASSWORD_RESET)
+                        ->where('user_id', $user->id)
+                        ->whereNull('consumed_at')
+                        ->where('id', '!=', $token->id)
+                        ->update(['consumed_at' => now()]);
 
-        if ($token === null) {
-            throw new InvalidResetTokenException('Token de redefinição não encontrado.');
+                    return $user;
+                },
+            );
+        } catch (InvalidTokenException $e) {
+            throw new InvalidResetTokenException($this->translate($e));
         }
-
-        if ($token->consumed_at !== null) {
-            throw new InvalidResetTokenException('Este link já foi utilizado.');
-        }
-
-        if (! $token->expires_at || $token->expires_at->isPast()) {
-            throw new InvalidResetTokenException('Este link expirou. Solicite um novo.');
-        }
-
-        $user = $token->user;
-        if ($user === null) {
-            throw new InvalidResetTokenException('Usuário associado ao token não existe mais.');
-        }
-
-        // Mark consumed first, then mutate the user. If two requests
-        // race, the second one will fail at the consumed_at check
-        // above (after re-fetching) — we accept the small overlap.
-        $token->consumed_at = now();
-        $token->save();
-
-        $user->password = Hash::make($newPassword);
-        // Rotating the remember token invalidates any "remember me"
-        // cookie an attacker might have captured before the reset.
-        $user->setRememberToken(Str::random(60));
-        $user->save();
-
-        // Invalidate every other active reset token for this user —
-        // a successful reset should kill the entire family of pending
-        // links so a leaked inbox link can't be used later.
-        EmailVerificationToken::query()
-            ->forPurpose(EmailVerificationToken::PURPOSE_PASSWORD_RESET)
-            ->where('user_id', $user->id)
-            ->whereNull('consumed_at')
-            ->where('id', '!=', $token->id)
-            ->update(['consumed_at' => now()]);
 
         return $user;
     }
@@ -159,41 +152,26 @@ class PasswordResetService
      */
     public function canRequestReset(string $email): bool
     {
-        $email = mb_strtolower(trim($email));
-        $key = $this->throttleKey($email);
-
-        $lastSentAt = Cache::get($key.':last_sent');
-        if ($lastSentAt !== null) {
-            $elapsed = abs((int) $lastSentAt->diffInSeconds(now()));
-            if ($elapsed < self::RESEND_COOLDOWN_SECONDS) {
-                return false;
-            }
-        }
-
-        $windowCount = (int) Cache::get($key.':hourly_count', 0);
-        if ($windowCount >= self::RESEND_HOURLY_CAP) {
-            return false;
-        }
-
-        return true;
+        return $this->tokens->canResend(
+            $email,
+            EmailVerificationToken::PURPOSE_PASSWORD_RESET,
+        );
     }
 
     /**
-     * Stamp the throttle keys after a successful send. Mirrors
-     * {@see EmailVerificationService::bumpResendCounter()} but keyed
-     * by email address instead of user id.
+     * Translate the generic English {@see InvalidTokenException}
+     * message into the pt-BR string the existing controllers
+     * surface to the user. The shape is identical to the
+     * pre-refactor implementation so the controller error flashes
+     * keep working without modification.
      */
-    private function bumpThrottle(string $email): void
+    private function translate(InvalidTokenException $e): string
     {
-        $key = $this->throttleKey($email);
-
-        Cache::put($key.':last_sent', now(), now()->addHour());
-        Cache::add($key.':hourly_count', 0, now()->addHour());
-        Cache::increment($key.':hourly_count');
-    }
-
-    private function throttleKey(string $email): string
-    {
-        return 'password-reset:throttle:'.hash('sha256', mb_strtolower(trim($email)));
+        return match ($e->getMessage()) {
+            'Token not found.' => 'Token de redefinição não encontrado.',
+            'Token already consumed.' => 'Este link já foi utilizado.',
+            'Token expired.' => 'Este link expirou. Solicite um novo.',
+            default => 'Este link não pode ser utilizado. Solicite um novo.',
+        };
     }
 }

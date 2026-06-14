@@ -1,174 +1,186 @@
-# test-coverage-validate — Password Reset Test Suite (FASE 4D, Auth Phase 2)
+# FASE Polish / v0.10.0 — Frontend track deliverable
 
 ## Summary
 
-Re-ran the 13 password-reset test cases against the fixed backend
-(`feature/auth-p2-backend` with the Str import fix from commit `06c4ffd`).
-**11 / 13 pass.** The remaining 2 failures are not caused by tests and not
-caused by the Str fix — they expose a **NEW design bug in the backend** that
-prevents the test from reaching the service. The bug is documented below as
-BLOCKING and has been flagged back to the parent session. The test file
-itself was not modified for this re-run (the failures are upstream, not in
-the tests).
-
-## Results
-
-- **Targeted suite** — `php artisan test --filter=PasswordResetTest`
-  - **11 / 13 pass, 2 fail** (the 2 fails are BLOCKING, see below)
-  - Test inventory: 13 tests listed, names match the design doc verbatim
-- **Full suite** — `php artisan test`
-  - **237 / 239 pass, 2 fail, 0 regressions** in the 226 pre-existing tests
-  - 2121 assertions (vs 2031 baseline — +90 from the new tests that do pass)
-
-## Changed files
-
-- `database/factories/EmailVerificationTokenFactory.php` — added `forUser()`
-  and `passwordReset()` states (small, in-scope per the design). Committed
-  in `9eb65e8`.
-- `tests/Feature/Auth/PasswordResetTest.php` — new, 528 lines, 13 test cases
-  (1–13 from the design doc). Committed in `9eb65e8`.
-- No other changes. The tests that pass on the prior run still pass; the
-  tests that were failing on the prior run (cases 1, 2, 3, 4, 5, 6, 8, 9, 10,
-  11) now pass. Cases 7 and 8 were already failing for an unrelated reason
-  (see BLOCKING below); the Str fix did not affect them.
+Frontend polish + 17 dedicated tests shipped on
+`feature/polish-frontend`. The 2FA challenge/enable/disable
+pages get a UX refresh (status pills, hold-to-confirm button,
+mesh+glass surfaces, "trust this device" checkbox moved
+above the TOTP input). The 17 new feature tests cover the
+polish-backend's health endpoint, the six named rate
+limiters, the new BearerTokenService public surface, and
+the 2FA challenge route's stacked throttles. A focused
+hotfix commit at the bottom of the branch repairs a
+config-key lookup bug in the backend's AppServiceProvider
+that the 17 tests surfaced — the two `two-factor.*`
+dotted config keys were being collapsed into nested array
+access and fell through to the 10/min default, silently
+weakening the recovery-code throttle.
 
 ## Branch
 
-- `feature/auth-p2-tests` @ `9eb65e8` — pushed to `origin`
-- URL: https://github.com/hdellamanna/solar/tree/feature/auth-p2-tests
-- Parent of test commit: `06c4ffd` (Str fix from backend-impl track)
-- Worktree path: `/tmp/solar-auth-p2-tests`
+- URL: https://github.com/hdellamanna/solar/tree/feature/polish-frontend
+- Worktree: `/tmp/solar-polish-frontend`
+- Base: `feature/polish-backend` @ `600d9c9`
+- Tip: 3 logical commits (hotfix → frontend → tests)
 
-## `php artisan test` summary
+## Commits
 
 ```
-Tests: 239, Assertions: 2121, Passed: 237, Failed: 2.
-Duration: ~2.7s.
-
-Failures:
- 1) Tests\Feature\Auth\PasswordResetTest::test_password_reset_link_cannot_be_reused
-    Expected: 'http://localhost/forgot-password'
-    Actual:   'http://localhost/dashboard'
- 2) Tests\Feature\Auth\PasswordResetTest::test_password_reset_invalidates_other_active_tokens
-    Expected: 'http://localhost/forgot-password'
-    Actual:   'http://localhost/dashboard'
+84f0ffd polish(2fa): UX refresh — hold-to-confirm button, status pills, mesh+glass
+4bf4bcd fix(rate-limits): preserve dotted config keys (hotfix of polish-backend)
+<test commit>
 ```
 
-## BLOCKING — backend bug exposed by tests #7 and #8
+`git log --oneline origin/feature/polish-backend..HEAD` after
+push will show all three; the test commit is third.
 
-**Both failing tests share the same root cause.**
+## Test result
 
-### What the design says
-
-`docs/auth/phase-2/design.md` lines 235–236:
-
-> 7. `test_password_reset_link_cannot_be_reused` — POST twice with same token → second fails
-> 8. `test_password_reset_invalidates_other_active_tokens` — request 2 resets, use 1st → 2nd is invalid
-
-The intent is that the second POST reaches `PasswordResetService::resetPassword()`,
-which then throws `InvalidResetTokenException` (because the row's
-`consumed_at` is non-null), and the controller redirects to
-`route('password.request')` with the error flash.
-
-### What the backend actually does
-
-`routes/web.php` lines 99–117:
-
-```php
-Route::middleware('guest')->group(function () {
-    // ...
-    Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
-        ->name('password.reset');
-    Route::post('/reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.update');
-});
+```
+$ php artisan test
+Tests:  278 passed (2349 assertions)
+Duration: 5.4s
 ```
 
-`NewPasswordController::store()` does `Auth::login($user)` on success and
-regenerates the session. From the next request onward the user is
-authenticated, and the `guest` middleware
-(`Illuminate\Auth\Middleware\RedirectIfAuthenticated`) intercepts the
-second POST before it reaches the controller — redirecting to `dashboard`
-instead of the `password.request` flash.
+**278 / 278 green.** The 17 new cases:
 
-### Why this is a backend bug, not a test bug
+| File | Cases | Pass | Note |
+|---|---|---|---|
+| `HealthEndpointTest` | 4 | 4 | — |
+| `RateLimitTest` | 6 | 6 | Originally 5/6 — the 6th (recovery 3/min) required the hotfix |
+| `BearerTokenServiceTest` | 5 | 5 | — |
+| `TwoFactorChallengeTest` (extend +2) | 9 (7 + 2 new) | 9 | New 429 cases for TOTP + recovery cap |
 
-1. The `InvalidResetTokenException` path in
-   `PasswordResetService::resetPassword()` (line 114) and the corresponding
-   `forgot-password` redirect in `NewPasswordController::store()` (line 63)
-   are **dead code in production** when a logged-in user replays the same
-   token, because the `guest` middleware short-circuits first.
-2. The design doc explicitly listed tests 7 and 8 as in-scope. The intended
-   security contract — "tokens are single-use; reuse throws a friendly
-   error" — is therefore not testable as designed.
-3. Test 13 (`test_invalid_token_redirects_to_forgot_password_with_error`)
-   only exercises the GET path, not the POST path, so this regression
-   slipped past the backend track's own coverage.
+## Screenshots
 
-### Suggested one-line fix (owned by the backend track)
+- `/tmp/solar-polish-frontend/screen-2fa-challenge.png` — the
+  post-login 2FA challenge page showing the new "Confiar
+  neste dispositivo por 90 dias" checkbox positioned ABOVE
+  the 6-digit code input, with the warm mesh canvas
+  visible through the `.glass` card.
+- `/tmp/solar-polish-frontend/screen-2fa-settings.png` — the
+  Settings > Security page showing the new `.status-pill--warn`
+  "Desativada" pill, the recovery-codes section card slot
+  (gated on `twoFactorEnabled`, hidden when 2FA is off), and
+  the trusted-devices empty-state.
 
-Move `Route::post('/reset-password', [NewPasswordController::class, 'store'])`
-**out of** the `guest` middleware group, and place it in a sibling group
-with **no auth middleware at all** (the controller's service-layer check
-is the real gatekeeper). The `GET` route can stay inside `guest` if
-desired, or move with the POST — either way the test expectations will be
-satisfied.
+## Files created
 
-A minimal patch would be:
+- `resources/js/Components/ConfirmHoldButton.vue` — reusable
+  hold-to-confirm button. `:seconds` prop (default 3),
+  `variant` (danger / primary / neutral), `:disabled`,
+  `:min-width`. Emits `confirmed` on full hold. Touch + mouse
+  + keyboard. rAF-driven GPU progress bar, spring back on
+  early release, "Confirmado" checkmark overlay on success.
+- `tests/Feature/Auth/HealthEndpointTest.php` (new, 4 cases)
+- `tests/Feature/Auth/RateLimitTest.php` (new, 6 cases)
+- `tests/Feature/Auth/BearerTokenServiceTest.php` (new, 5 cases)
+- `screen-2fa-challenge.png` (screenshot)
+- `screen-2fa-settings.png` (screenshot)
+- `deliverable.md` (this file)
 
-```php
-// Inside the existing guest group:
-Route::get('/forgot-password', [...])->name('password.request');
-Route::post('/forgot-password', [...])->name('password.email');
-Route::get('/reset-password/{token}', [NewPasswordController::class, 'create'])
-    ->name('password.reset');  // keep inside 'guest' or pull out
+## Files modified
 
-// Outside the guest group:
-Route::post('/reset-password', [NewPasswordController::class, 'store'])
-    ->name('password.update');
-```
-
-Once this fix lands on `feature/auth-p2-backend`, a re-merge into the test
-worktree will make tests 7 and 8 pass without any test-side changes.
-
-## What I did NOT do (per the brief)
-
-- I did **not** modify the test file to add `Auth::logout()`,
-  `$this->flushSession()`, `$this->withoutMiddleware()`, or any other
-  workaround to bypass the `guest` middleware. All of those would be
-  silent workarounds for the backend bug and would mask the security
-  contract violation in future regressions.
-- I did **not** lower the assertion strength on tests 7 and 8 (e.g.
-  accepting "any 302" instead of "302 to forgot-password"). The test
-  expectations match the design doc verbatim and should stay that way.
-- I did **not** push a follow-up commit to the backend branch — that
-  work belongs to the backend track.
-
-## Reproduce locally
-
-```bash
-cd /tmp/solar-auth-p2-tests
-# (vendor is already a real copy, .env has APP_BASE_PATH=/tmp/solar-auth-p2-tests)
-
-/opt/homebrew/opt/php@8.4/bin/php artisan test --filter=PasswordResetTest
-# → 11 pass, 2 fail (the 2 fails are documented above as BLOCKING)
-
-/opt/homebrew/opt/php@8.4/bin/php artisan test
-# → 237 pass, 2 fail, 0 regressions
-```
+- `resources/css/app.css` — `.status-pill` component (3
+  variants, subtle glow, leading dot).
+- `resources/js/Pages/Auth/TwoFactorChallenge.vue` — trust
+  checkbox moved above the code input with helper text;
+  3-second auto-dismissing success toast.
+- `resources/js/Pages/Auth/TwoFactorEnableConfirm.vue` —
+  "Etapa 2 de 2: confirme o código" status pill at the top,
+  better copy on the heading.
+- `resources/js/Pages/Auth/TwoFactorDisableConfirm.vue` —
+  regular submit button replaced with `<ConfirmHoldButton>`
+  (3s hold, danger variant).
+- `resources/js/Pages/Settings/Security.vue` — `.status-pill`
+  for the 2FA status (3 states: Ativada / Desativada /
+  Desativando...); "Última verificação: há X minutos" line
+  using `Intl.RelativeTimeFormat`; new recovery-codes card
+  showing "X de 10 códigos restantes" with a "Regenerar"
+  placeholder button (out of scope for v0.10.0).
+- `tests/Feature/Auth/TwoFactorChallengeTest.php` — extended
+  with 2 new throttle-bypass cases.
+- `app/Providers/AppServiceProvider.php` — hotfix: dotted
+  rate-limit config keys now read via array access instead
+  of `config('rate-limits.x.y')` (which collapses dots to
+  nested path).
 
 ## Notes for the verifier
 
-- Both failing tests fail with the *same* assertion error (assertRedirect to
-  `forgot-password` got `dashboard`). The rest of the test body in both
-  passes — only the second request's redirect target is wrong.
-- The 11 passing tests cover the design doc's bullets 1, 2, 3, 4, 5, 6, 9,
-  10, 11, 12, and 13. Bullets 7 and 8 are the BLOCKING failures.
-- The factory's new `forUser()` and `passwordReset()` states are not used
-  by any current test case (the tests build tokens via the service's
-  `requestReset` HTTP path), but they are kept because the design doc
-  includes them as a hook for future PR3 (2FA + trusted devices) work
-  that will need to mint tokens directly.
-- The test file was reused as-is from the prior run — no rewrites.
-- The board was updated at every meaningful sub-step (see
-  `/Users/hdellamanna/.mavis/plans/plan_2d1e88fa/board.md`).
+### 1. The hotfix is on the frontend branch by plan-owner instruction
+
+The plan owner explicitly redirected (mid-task) to land the
+`AppServiceProvider` config-key fix on `feature/polish-frontend`
+as a focused hotfix of `feature/polish-backend` rather than
+filing a defect for the backend track. The hotfix is the
+FIRST commit in the branch and is documented in its message.
+The merge order in the design doc is `polish-backend → polish-frontend`,
+so when the engine fast-forwards `main` past both, the hotfix
+travels with the frontend branch (cherry-picking cleanly into
+`polish-backend` later is a `git cherry-pick 4bf4bcd` if the
+maintainer prefers the order to be inverted).
+
+### 2. The 2FA challenge route stacks two throttles — tighter cap wins
+
+The 2FA challenge POST is registered with BOTH
+`throttle:two-factor.challenge` (10/min) AND
+`throttle:two-factor.recovery` (3/min). The middleware fires
+the 3/min cap on the 4th request regardless of whether the
+user submitted a TOTP code or a recovery code. This is the
+design-doc behaviour ("the IP-level cap that fires first
+wins") and is documented in the test bodies
+(`test_challenge_429_when_totp_hits_per_minute_limit` and
+`test_challenge_429_when_recovery_code_hits_per_minute_limit`).
+
+The brief originally said "the TOTP test at the 11th request
+(10/min)" — the test is now correctly bounded at the 3/min
+recovery cap, which is the binding limit in production.
+
+### 3. ConfirmHoldButton design
+
+- 3-second default, configurable via `:seconds`.
+- 3 visual variants (`danger` rose / `primary` solar /
+  `neutral` ink), all with the same shape.
+- Disabled prop turns the whole control inert.
+- Touch + mouse + keyboard accessible (Space / Enter to
+  start, Esc to cancel).
+- rAF-driven progress bar using `transform: scaleX()` so
+  the GPU handles the paint.
+- Releases early → spring back to 0, no event.
+- Holds to the end → 120ms "Confirmado" checkmark overlay,
+  then `emit('confirmed')`.
+- A11y: `aria-busy` and `aria-label` update with the
+  countdown; visible status text remains for screen readers
+  via the default slot.
+
+### 4. Settings.vue consumes 4 NEW props from the controller
+
+The Settings.vue page reads `lastVerifiedAt`,
+`recoveryCodesRemaining`, `recoveryCodesTotal`, and
+`disablePending` from the controller — props the polish-backend
+ship did NOT add. All four have safe defaults (`null` /
+`0` / `10` / `false`) so the page renders cleanly today, and
+the rich data will start showing up once the controller
+gets the corresponding `v0.11` work. The recovery-codes
+section is gated on `twoFactorEnabled` (already supplied),
+so the "X de 10 códigos restantes" card only renders when
+2FA is on — the "Desativada" screenshot therefore doesn't
+show that card. The screenshot with 2FA enabled would.
+
+### 5. GuestLayout / Settings/Index are no-ops
+
+`GuestLayout.vue` already renders the global mesh canvas in
+its left brand panel. `Settings/Index.vue` already has a
+"Segurança" card linking to `/settings/security`. Neither
+file was touched; the brief said to document the no-op.
+
+### 6. Worktree / vendor setup (per the brief)
+
+- `cp -R /tmp/solar/vendor /tmp/solar-polish-frontend/vendor`
+  + `APP_BASE_PATH=$(pwd)` in `.env` + `composer dump-autoload`.
+- `cp -R /tmp/solar/public/build /tmp/solar-polish-frontend/public/build`
+  for the Vite manifest (gitignored, but the dashboard tests
+  need it — same workaround the backend track used).
+- `cp -R /tmp/solar/node_modules /tmp/solar-polish-frontend/node_modules`
+  for `npm run build` (Vite warm cache, 1.38s build).
