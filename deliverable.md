@@ -11,17 +11,29 @@ extracted from the three email-token services (public surface preserved
 `.env.example` updates. All 261 existing tests pass without
 modification.
 
+**Attempt 2 fix:** the previous attempt's `RequestIdProcessor`
+called `Log::sharedContext()->get($key)` under the false
+assumption that `sharedContext()` returns a Collection. In
+Laravel 13 it returns a plain `array` (LogManager declares
+`@return array`), so the call threw on every record and the
+structured log file was never created. Fixed by switching to
+array access and adding an `is_array()` guard. The structured
+channel is now verified to write a JSON line per record with
+the request id attached to both `context` and `extra`.
+
 ## Branch
 
 - URL: https://github.com/hdellamanna/solar/tree/feature/polish-backend
 - Worktree: `/tmp/solar-polish-backend`
 - Base: `main` @ `ddf24f2`
-- Tip: `26fa6f7955badf0ce3fc91bfd2ad35020c8a5ae3`
-- Commits: 5 logical commits (refactor → rate limiting → observability → health → docs)
+- Tip: `c478b9d` (latest) / `ccbb82c` (deliverable) — see commit list
+- Commits: 7 logical commits (refactor → rate limiting → observability → health → docs → deliverable → logging-fix)
 
 ## Commit hashes
 
 ```
+c478b9d fix(logging): RequestIdProcessor treats sharedContext as array, not Collection
+ccbb82c docs: add v0.10.0 backend polish deliverable
 26fa6f7 docs: README v0.10.0 status + observability section; .env.example polish keys; sentry-laravel
 ff814e4 feat(health): bounded /up health probe with 4 subsystem checks
 100326c feat(observability): X-Request-Id middleware + structured JSON log channel
@@ -70,6 +82,46 @@ equivalent to the pre-refactor implementation.
 | `README.md` | Updates "Current status" to v0.10.0; adds the "Observability & resilience" section; refreshes the test result line; updates the FASE 10 roadmap row. |
 
 ## Notes for the verifier
+
+### Bug fix (attempt 2)
+
+The first attempt's `RequestIdProcessor::__invoke` called
+`Log::sharedContext()->get(self::EXTRA_KEY)`. Laravel 13's
+`Illuminate\Log\LogManager::sharedContext()` is declared
+`@return array` — it returns the raw `$this->sharedContext`
+property, NOT an `Illuminate\Support\Collection`. The call
+therefore threw `Call to a member function get() on array` on
+every record that flowed through the processor, and the
+structured log file was never written to in production.
+
+The fix (commit `c478b9d`):
+
+```php
+$context = Log::sharedContext();
+$requestId = is_array($context) ? ($context[self::EXTRA_KEY] ?? null) : null;
+```
+
+Manual end-to-end verification (outside the test suite, which
+doesn't exercise the structured channel):
+
+```
+$ LOG_STACK=single,structured \
+    php artisan tinker --execute='
+      \Illuminate\Support\Facades\Log::shareContext(["request_id" => "req_test123"]);
+      \Illuminate\Support\Facades\Log::info("foo", ["k" => "v"]);
+    '
+$ cat storage/logs/structured.log
+{"message":"foo","context":{"request_id":"req_test123","k":"v"},
+ "level":200,"level_name":"INFO","channel":"local",
+ "datetime":"2026-06-14T00:13:54.027558+00:00",
+ "extra":{"request_id":"req_test123"}}
+```
+
+The same record also lands in `storage/logs/laravel.log`
+under the `single` channel — operators get both human-readable
+and JSON output without any extra wiring. The processor's
+fallback (fresh `req_` id) was verified separately for the
+CLI / queue-worker case.
 
 ### Backward compatibility — the critical bit
 
