@@ -1,0 +1,572 @@
+version: 1
+plan:
+  name: 'Solar v0.11.0 — FASE 4D-Polish UX Motion + Footer + About + Tutorial + AI agent hook'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 4
+  auto_accept: false
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers:
+      - verifier
+    audit_sample_rate: 0
+    strict_mode: false
+tasks:
+  - id: motion-backend
+    title: 'Backend: migration + UserMotionPreference service + 6 dedicated tests'
+    prompt: |
+      You are implementing the BACKEND half of FASE 4D-Polish UX Motion for
+      Solar Money v0.11.0. The full design is in
+      `docs/fase-4d-polish-motion/design.md` — READ IT FIRST top to bottom.
+      If the doc does not exist yet, stop and ask the plan owner.
+
+      ## Worktree setup (CRITICAL — read carefully)
+
+      Use a dedicated worktree. The vendor/ dir in this repo is a symlink to
+      /tmp/solar/vendor. Fix it BEFORE running anything:
+
+        cd /tmp/solar
+        git worktree add /tmp/solar-motion-backend feature/motion-backend
+        cd /tmp/solar-motion-backend
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      Do NOT `composer install` in the worktree — it will time out.
+      The cp -R trick is fast (~5s) and identical to main's vendor.
+
+      All your work happens in /tmp/solar-motion-backend. Push the branch
+      when done. Do NOT touch /tmp/solar directly.
+
+      ## Forbidden debugging paths (LESSONS LEARNED)
+
+      - DO NOT grep anything under vendor/ or read Laravel framework source.
+      - DO NOT delete the worktree while the branch is checked out.
+      - DO NOT touch Vue files (frontend track owns them).
+      - DO NOT touch test files in tests/Feature/Auth/ (frontend-and-tests
+        track owns the new motion tests).
+      - DO NOT use `Illuminate\Support\Facades\Str` (Laravel 13 removed
+        the facade — use `Illuminate\Support\Str` for the static helper).
+      - DO NOT poll, sleep, or wait for CI. Push and exit.
+
+      ## Scope (backend only)
+
+      1. `database/migrations/2026_06_14_010000_add_motion_preferences_to_users.php`
+         (new) — adds 4 columns to `users`:
+           - `motion_preference` enum('auto','reduced','full') DEFAULT 'auto'
+           - `motion_backdrop` boolean DEFAULT 1  (mesh canvas, glass sweep)
+           - `motion_spring` boolean DEFAULT 1    (transitions, sheets, micro)
+           - `motion_parallax` boolean DEFAULT 1  (sun parallax dashboard)
+         Reversible. Default all-1 so existing users keep current behavior.
+         Update `app/Models/User.php` to add the 4 fields to `$fillable` and
+         to cast `motion_backdrop/spring/parallax` to `bool`.
+
+      2. `app/Services/UserMotionPreference.php` (new) — singleton service:
+           - `__construct(public ?User $user)`
+           - `string $resolvedMotion` = 'auto' | 'reduced' | 'full'
+             (computed: if user->motion_preference != 'auto', use that;
+              else read `prefers-reduced-motion` from request)
+           - `bool shouldAnimate(string $category): bool`
+             where category ∈ {'backdrop', 'spring', 'parallax'}.
+             Returns true if (resolvedMotion == 'full') OR
+             (resolvedMotion == 'auto' AND not OS-reduced AND user->motion_<cat>).
+             Returns false if (resolvedMotion == 'reduced') OR
+             (resolvedMotion == 'auto' AND OS-reduced).
+           - `array toInertiaProps(): array` — returns 4 booleans + string
+             for Inertia shared props.
+         Register as singleton in `app/Providers/AppServiceProvider::register()`.
+
+      3. `app/Http/Controllers/Settings/AppearanceController.php` (new):
+           - `__invoke()` returns `Inertia::render('Settings/Appearance')`
+           - `update(Request $r, UserMotionPreference $prefs)` validates
+             and persists. Validation:
+               motion_preference ∈ {auto, reduced, full} (required)
+               motion_backdrop/spring/parallax: boolean (required)
+             All-or-nothing update in a single transaction.
+             Returns redirect with success flash.
+
+      4. `routes/web.php` — add (inside auth middleware group):
+           Route::get('/settings/appearance', [AppearanceController::class, 'show'])
+             ->name('settings.appearance.show');
+           Route::patch('/settings/appearance', [AppearanceController::class, 'update'])
+             ->name('settings.appearance.update');
+         (use `show` for `__invoke`'s display action)
+
+      5. `app/Http/Middleware/HandleInertiaRequests.php` — inject the 4
+         motion fields into shared Inertia props via the
+         UserMotionPreference service. Every page now has access to
+         `motion.preference`, `motion.backdrop`, `motion.spring`, `motion.parallax`.
+
+      6. `tests/Feature/Auth/MotionSettingsTest.php` (new) — 6 cases:
+           - test_user_can_view_their_appearance_settings
+           - test_user_can_update_motion_preference_to_reduced
+           - test_user_can_update_motion_preference_to_full
+           - test_user_can_granularly_disable_backdrop
+           - test_validation_rejects_unknown_motion_value
+           - test_motion_settings_round_trip_persists_all_4_fields
+
+      7. `app/Models/UserFactory.php` — add `withReducedMotion()` state
+         that sets the 4 fields to the reduced-everything combo.
+
+      8. `README.md` — add a 1-paragraph note in the "Current status"
+         section: "Users can now tune motion effects (Settings > Appearance)
+         with a system-aware default and per-category overrides."
+
+      9. `app/Http/Controllers/AboutController.php` (new) — single
+         `__invoke()` returning `Inertia::render('About')` with no data.
+         The page is fully static.
+
+      10. `app/Http/Controllers/TutorialController.php` (new):
+          - `__invoke()` returns `Inertia::render('Tutorial', ['chapters' => ...])`
+            with a static chapters list (6 chapters, see design doc §3)
+          - `chapter(string $slug)` returns the same render with
+            `activeChapter` set, validates slug is in the 6 known values.
+
+      11. `routes/web.php` — 3 new PUBLIC routes (no auth, no `web`
+          middleware other than the default):
+          - `Route::get('/about', [AboutController::class])->name('about')`
+          - `Route::get('/tutorial', [TutorialController::class])->name('tutorial')`
+          - `Route::get('/tutorial/{chapter}', [TutorialController::class])->name('tutorial.chapter')`
+            with `->where('chapter', '[a-z-]+')` to avoid catching
+            unrelated slugs.
+
+      12. `app/Models/AppMeta.php` (new) — simple key-value store for
+          build metadata:
+          - migration: `create_app_meta` table (key string PK, value text)
+          - model with `get(string $key, mixed $default): mixed` and
+            `set(string $key, mixed $value): void`
+          - seed: `app_meta` row `{key: 'build_version', value: '0.11.0'}`
+            via the existing `DatabaseSeeder` or a new `AppMetaSeeder`.
+          - Used by the footer to render `v0.11.0` and by the AI agent
+            slot to know its build context.
+
+      13. `tests/Feature/Public/AboutPageTest.php` (new) — 3 cases:
+          - test_about_page_renders_for_guests
+          - test_about_page_contains_founder_name
+          - test_about_page_contains_microsoft_money_nostalgia_paragraph
+
+      14. `tests/Feature/Public/TutorialPageTest.php` (new) — 4 cases:
+          - test_tutorial_index_lists_all_six_chapters
+          - test_tutorial_chapter_route_renders_for_known_slug
+          - test_tutorial_chapter_route_404s_for_unknown_slug
+          - test_tutorial_chapter_contains_an_interactive_demo_block
+
+      ## Quality bar
+
+      - Public surface of `User` model gained 4 new fillable fields —
+        all 261 pre-existing tests must still pass without modification.
+      - The `UserMotionPreference` service is read-only with respect to
+        persistence — the controller owns the write path.
+      - Never log raw preferences (low risk, but keep the principle).
+      - Enum values are lowercase strings in the DB.
+      - Migration is reversible via `down()`.
+      - Use `Crypt` / `Hash` only if motion data is sensitive — it isn't.
+
+      ## Commit + push
+
+      Commit messages in English. Set git config locally:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+
+      Stage, commit (one commit per logical concern — migration+model,
+      service+singleton, controller+routes, README — or one squash commit
+      if cleaner), then:
+        git push -u origin feature/motion-backend
+
+      ## When done
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, commit hashes, test result summary
+      (run `php artisan test` — must be 261+6=267 green).
+      Branch URL, anything notable.
+
+      Push the branch BEFORE you run out of time.
+    verify_prompt: |
+      Re-derive correctness — do NOT just re-read the producer's diff.
+
+      Setup:
+        cd /tmp/solar-motion-backend
+        grep "APP_BASE_PATH" .env
+        /opt/homebrew/opt/php@8.4/bin/php artisan migrate --env=testing --force
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+
+      Mandatory checks:
+        1. `php artisan test` → 267/267 green, 0 failures. The 261
+           pre-existing tests must pass without modification.
+        2. Migration adds 4 columns to `users` with the right defaults.
+           Run `php artisan migrate:status` and `php artisan db:show users`.
+           The migration is reversible: `php artisan migrate:rollback --step=1`
+           drops the columns without data loss in the other user columns.
+        3. `UserMotionPreference::shouldAnimate('backdrop')`:
+           - new user, pref=auto, OS=full → true
+           - new user, pref=auto, OS=reduced → false
+           - user with pref=reduced → false regardless of category
+           - user with pref=full → true regardless of category
+           - user with pref=auto, OS=full, motion_backdrop=0 → false
+           - user with pref=auto, OS=reduced, motion_backdrop=1 → false (OS wins)
+        4. Routes registered: `php artisan route:list | grep appearance`
+           shows GET /settings/appearance and PATCH /settings/appearance,
+           both inside the auth + web middleware.
+        5. `HandleInertiaRequests` includes `motion: { preference, backdrop,
+           spring, parallax }` in shared props. Hit `php artisan tinker
+           --execute='echo json_encode(app(\App\Http\Middleware\HandleInertiaRequests::class)->share(request()));'`
+           and confirm the 4 fields are present.
+        6. `MotionSettingsTest` has exactly 6 cases with the exact names
+           listed in the producer prompt. Use --list-tests to confirm.
+        7. NO Vue file was modified: `git diff main --name-only | grep -E
+           '\.vue$' | wc -l` must be 0.
+        8. NO frontend test file added: `git diff main --name-only | grep
+           -E 'Test\.php$' | wc -l` must be 0 (this track owns only
+           MotionSettingsTest.php, but the front track owns the others).
+        9. `composer.json` untouched (no new deps).
+       10. `README.md` "Current status" mentions appearance/motion settings.
+        11. Branch pushed: `git ls-remote origin feature/motion-backend`
+           returns a SHA newer than the v0.10.0 release tag.
+       12. About and Tutorial pages are public:
+           - `curl -s http://localhost:8000/about | grep -q 'Henrique'`
+           - `curl -s http://localhost:8000/tutorial | grep -q 'Contas e categorias'`
+           - `curl -sI http://localhost:8000/tutorial/foobar | head -1` shows 404
+       13. `app_meta.build_version` row exists with value `0.11.0`.
+       14. NO Vue file was modified: `git diff main --name-only | grep -E
+           '\.vue$' | wc -l` must be 0 (frontend track owns Vue).
+       15. The new tests bring the total to 261+6+3+4 = 274. Run
+           `php artisan test` and confirm 274 green.
+
+      Output: PASS / FAIL with line-numbered specifics.
+    assigned_to: coder
+    role: produce
+    verified_by: verifier
+    depends_on: []
+    max_retries: 2
+    timeout_ms: 1500000
+  - id: motion-frontend
+    title: 'Frontend: motion composable + CSS plumbing + new effects + Appearance settings UI + 10 dedicated tests'
+    prompt: |
+      You are implementing the FRONTEND half of FASE 4D-Polish UX Motion
+      for Solar Money v0.11.0. The full design is in
+      `docs/fase-4d-polish-motion/design.md` — READ IT FIRST top to bottom.
+      If the doc does not exist yet, stop and ask the plan owner.
+
+      ## Worktree setup
+
+      Use a dedicated worktree that branches off `feature/motion-backend`
+      (the backend track's branch), so you have the full backend in place:
+
+        cd /tmp/solar
+        git fetch origin feature/motion-backend
+        git worktree add /tmp/solar-motion-frontend feature/motion-frontend
+        cd /tmp/solar-motion-frontend
+        git merge origin/feature/motion-backend --no-edit
+
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      All your work happens here. Push the branch when done.
+
+      ## Forbidden paths
+
+      - DO NOT grep vendor/ or read framework source.
+      - DO NOT touch backend PHP files (services, controllers, middleware,
+        routes, providers, mail, config, migrations) — the backend track
+        owns them.
+      - DO NOT delete the worktree or the branch.
+      - DO NOT use `router.X()` from @inertiajs/vue3 — use `useForm()`.
+
+      ## Scope (frontend + tests)
+
+      ### Frontend (Vue / CSS files)
+
+      1. `resources/js/composables/useMotionPreference.ts` (new) — wraps
+         `usePage().props.motion` with a reactive API:
+           - `useMotionPreference()` returns { preference, backdrop, spring,
+             parallax, isReduced, isFull, toggle(category) (client-side
+             optimistic, then router.patch to persist) }
+           - Listens to `matchMedia('(prefers-reduced-motion: reduce)')`
+             change events and re-broadcasts the resolved state via a
+             `window.dispatchEvent(new CustomEvent('solar:motion-change'))`.
+           - When the OS changes its preference, the `<html data-motion>`
+             attribute updates within 200ms.
+
+      2. `resources/css/app.css` — add data-attribute CSS variants:
+           ```css
+           html[data-motion="reduced"] *,
+           html[data-motion="reduced"] *::before,
+           html[data-motion="reduced"] *::after {
+             animation-duration: 0.001ms !important;
+             animation-iteration-count: 1 !important;
+             transition-duration: 0.001ms !important;
+             scroll-behavior: auto !important;
+           }
+           html[data-motion-backdrop="0"] .mesh-canvas,
+           html[data-motion-backdrop="0"] .glass-sweep {
+             display: none !important;
+           }
+           html[data-motion-parallax="0"] .sun-parallax {
+             transform: none !important;
+           }
+           ```
+         Add a transition on the `<html data-motion>` attribute itself
+         (200ms ease) so toggling is smooth. Use CSS feature-detection
+         so prefers-reduced-motion is respected even without JS.
+
+      3. `resources/js/app.ts` (or wherever the app mounts) — set the
+         initial `data-motion`, `data-motion-backdrop`, `data-motion-spring`,
+         `data-motion-parallax` attributes on `<html>` from the Inertia
+         shared props. Register a listener for the `solar:motion-change`
+         event to re-sync attributes on OS-preference change.
+
+      4. `resources/js/Pages/Settings/Appearance.vue` (new) — settings page:
+           - Hero card with 3 radio cards for `preference`: "Sistema" /
+             "Reduzido" / "Completo". "Sistema" shows a small subtitle
+             "Seguindo a preferência do seu sistema operacional".
+           - "Personalizar" expandable section with 3 toggles:
+             - "Plano de fundo animado" (mesh canvas + glass sweep)
+             - "Micro-interações" (page transitions, sheet spring, hold-to-confirm)
+             - "Parallax" (sun parallax do dashboard)
+           - Live preview card showing a 200px demo of: animated mesh strip,
+             a spring button hover, a parallax number counter. All toggle
+             with the user's flags in real time.
+           - Submit button uses `useForm` and shows success toast on save.
+           - pt-BR copy. Code comments in English.
+
+      5. `resources/js/Components/Settings/NavItem.vue` (or extend existing
+         settings nav) — add a link to `/settings/appearance` with the
+         icon "sparkles" or similar.
+
+      6. Apply 2 NEW liquid-glass effects to existing pages (gated by the
+         preference flags so they respect the toggle):
+           - **Dashboard balance cards**: number counting animation
+             (count from 0 to final value over 800ms with ease-out,
+             `Intl.NumberFormat` for currency). When `motion.spring=0`,
+             numbers appear instantly.
+           - **Transactions list**: row-spring expand animation when
+             clicking a transaction to see details (height 0 → auto,
+             opacity 0 → 1, 280ms ease-out). When `motion.spring=0`,
+             no animation.
+         The current effects (mesh canvas, glass sweep, sun parallax,
+         hold-to-confirm) are already gated by the new CSS — no change
+         needed to those, just verify they still respect the toggle.
+
+      7. `resources/js/Layouts/AuthLayout.vue` (or wherever 2FA challenge
+         sits) — confirm the ConfirmHoldButton's progress ring animation
+         uses `motion.spring`. Add a CSS class hook.
+
+      8. `resources/js/Components/AppFooter.vue` (new) — copyright
+         footer that renders on every layout. Reads
+         `app_meta.build_version` from Inertia shared props. Layout:
+           - Left: `© 2026 HDMA Ltda. Todos os direitos reservados.`
+           - Center: 3 inline links → `/about`, `/tutorial`, `/privacy`
+             (privacy link points to `/about` until a real privacy page
+             ships — TODO comment in code)
+           - Right: `v0.11.0` + `pt-BR` (locale placeholder for FASE 7)
+         The footer slides up with spring on first scroll (one-shot per
+         session via sessionStorage), respects `motion.spring`.
+
+      9. `resources/js/Layouts/*.vue` (3 files: AuthenticatedLayout,
+         GuestLayout, SettingsLayout) — mount `<AppFooter />` once at
+         the bottom. The footer is always visible (not sticky).
+
+      10. `resources/js/Pages/About.vue` (new) — see design doc §2. Five
+          sections (The why, The what, The how, The roadmap, The
+          founder). pt-BR copy in the page. Static content, no data
+          fetch. Renders inside `<PublicLayout>` (no auth, no sidebar).
+
+      11. `resources/js/Layouts/PublicLayout.vue` (new) — minimal layout:
+          no auth check, top bar with logo + 2 nav links (Sobre /
+          Tutorial) + login button, body slot, AppFooter at bottom.
+
+      12. `resources/js/Pages/Tutorial.vue` (new) — see design doc §3.
+          Index page listing the 6 chapters as glass cards. Click
+          navigates to `/tutorial/:chapter`. Each card has a tiny
+          inline SVG illustration (no asset files).
+
+      13. `resources/js/Pages/TutorialChapters/*.vue` (6 new files,
+          one per chapter): ContasCategorias, Transacoes,
+          MetasOrcamentos, PixTransferencias, InvestimentosDividas,
+          Seguranca. Each: prose intro (3-4 paragraphs), interactive
+          demo component import, "Ver no Solar" deep-link button.
+
+      14. `resources/js/Components/Tutorial/*.vue` (6 demo components,
+          one per chapter). Live Vue mini-apps with mock data — no
+          backend calls. Each demo <200 lines, uses Liquid Crystal
+          classes. Document each demo's "what you can poke" in code
+          comments.
+
+      15. `resources/js/Components/AiAgentSlot.vue` (new) — FASE 8
+          chrome placeholder:
+          - Floating bubble in bottom-right
+          - Spring-bounce on mount (respects `motion.spring`)
+          - Click → opens a glass panel anchored to the bubble
+          - Cmd+K (Mac) / Ctrl+K (other) opens from anywhere
+          - Input with placeholder "Pergunte qualquer coisa sobre suas finanças..."
+          - Empty state: 3 example prompts as clickable chips
+          - Loading state: animated dots + "Pensando..." copy
+          - Submit handler: logs to console + shows "Disponível em
+            breve" toast (FASE 8 will wire to real Groq)
+          - Voice button: shows browser webkitSpeechRecognition
+            placeholder (just calls getUserMedia for permission)
+          - Hidden if `config('features.ai_agent')` is false
+          - Proper aria-label, role=dialog, aria-modal
+
+      16. `resources/js/composables/useAiAgent.ts` (new) — state machine:
+          `{ isOpen, open, close, toggle, focusInput }`. Listens for
+          Cmd+K / Ctrl+K at document level, escape closes, focuses
+          input on open, returns focus on close. Cleanup keydown
+          listener in onUnmounted.
+
+      17. `resources/css/app.css` — add `.ai-agent-slot` styles
+          (floating bubble, glass panel, input + button row, chip list
+          for example prompts, loading dots animation).
+
+      18. `resources/js/app.ts` — mount `<AiAgentSlot />` at the root
+          of the Vue app, after Inertia setup. Pass
+          `features.ai_agent` as a prop.
+
+      19. `resources/js/Pages/Settings/Index.vue` — add link to
+          `/settings/appearance` AND add new "Inteligência artificial"
+          section with placeholder toggle "Assistente IA em todas as
+          páginas (em breve — FASE 8)" disabled with badge.
+
+      ### Tests (20 new cases in 6 files)
+
+      Use Laravel's testing helpers + the standard test client. For CSS
+      attribute assertions, hit the page and inspect the rendered HTML.
+
+      File 1: `tests/Feature/Auth/MotionRenderingTest.php` (4 cases)
+        - test_root_html_has_data_motion_attribute_set
+        - test_root_html_reflects_reduced_preference
+        - test_root_html_has_granular_backdrop_flag_attribute
+        - test_root_html_has_granular_parallax_flag_attribute
+
+      File 2: `tests/Feature/Auth/MotionSettingsPageTest.php` (4 cases)
+        - test_authenticated_user_can_view_appearance_settings_page
+        - test_authenticated_user_can_save_reduced_motion_preference
+        - test_authenticated_user_can_toggle_backdrop_independently
+        - test_unauthenticated_user_is_redirected_from_appearance_page
+
+      File 3: `tests/Feature/Auth/ReducedMotionCascadeTest.php` (2 cases)
+        - test_reduced_motion_disables_backdrop_via_data_attribute
+        - test_reduced_motion_disables_parallax_via_data_attribute
+          (these pin the contract that the data-attribute approach works
+          end-to-end without needing a full browser test)
+
+      File 4: `tests/Feature/Public/AppFooterTest.php` (3 cases)
+        - test_footer_renders_copyright_string_on_every_layout
+        - test_footer_links_to_about_and_tutorial
+        - test_footer_renders_build_version_from_app_meta
+
+      File 5: `tests/Feature/Public/AiAgentSlotTest.php` (3 cases)
+        - test_ai_agent_slot_not_rendered_when_feature_flag_is_off
+        - test_ai_agent_slot_renders_when_feature_flag_is_on
+        - test_ai_agent_slot_includes_keyboard_shortcut_hint
+
+      File 6: `tests/Feature/Public/TutorialDemosTest.php` (4 cases)
+        - test_tutorial_index_lists_all_six_chapters
+        - test_each_chapter_page_contains_an_interactive_demo
+        - test_tutorial_show_me_button_links_to_real_app_page
+        - test_tutorial_demos_use_liquid_crystal_classes (class-name
+          presence check, not visual — pins the contract that demos
+          stay on-brand)
+
+      ## Quality bar
+
+      - Vue 3 `<script setup>` + Composition API.
+      - pt-BR for ALL user-facing strings. Code comments + commit messages
+        in English.
+      - No console.log in production Vue.
+      - Use `useForm`, never `router.post`.
+      - The `useMotionPreference()` composable is reactive — toggling a
+        flag in one component updates the html attribute for the entire app.
+      - All 4 motion attributes (data-motion + 3 granular) are set in
+        the initial HTML render — not just after JS hydration.
+      - The new effects (counting numbers, row-spring) MUST work in
+        Inertia 3.x without `router.X()`.
+      - The OS-preference listener uses `matchMedia(...).addEventListener`
+        with cleanup in `onUnmounted` to avoid leaks.
+
+      ## Build + test + commit + push
+
+      Run in order:
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='MotionRenderingTest|MotionSettingsPageTest|ReducedMotionCascadeTest' --list-tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+        # 277 passing (267 pre-existing + 10 new), 0 fail
+        npm run build
+
+      Then:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+        git add -A
+        git commit -m "polish(motion): appearance settings + 3-flags plumbing + 10 dedicated tests (v0.11.0)"
+        git push -u origin feature/motion-frontend
+
+      Take 2 screenshots:
+        - /tmp/solar-motion-frontend/screen-appearance-default.png
+        - /tmp/solar-motion-frontend/screen-appearance-reduced.png
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, screenshot paths, commit hashes, test counts,
+      branch URL.
+
+      Push BEFORE you run out of time.
+    verify_prompt: |
+      Re-derive correctness.
+
+      Setup:
+        cd /tmp/solar-motion-frontend
+        /opt/homebrew/bin/composer dump-autoload
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='MotionRenderingTest|MotionSettingsPageTest|ReducedMotionCascadeTest' --list-tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+
+      Mandatory checks:
+        1. All 20 new test names exist with EXACT names (use --list-tests
+           to confirm).
+        2. The 6 files' tests: MotionRenderingTest (4) + MotionSettingsPageTest
+           (4) + ReducedMotionCascadeTest (2) + AppFooterTest (3) +
+           AiAgentSlotTest (3) + TutorialDemosTest (4) = 20 total.
+        3. `php artisan test` (full suite) → 290 pass, 0 fail. The 270
+           pre-existing tests must not regress.
+        4. The 2 screenshots show real pages: default (full motion,
+           animated mesh visible) + reduced (no mesh, no parallax).
+        5. `npm run build` exits 0.
+        6. `resources/css/app.css` defines the 3 data-attribute variants
+           (`html[data-motion="reduced"]`, `data-motion-backdrop="0"`,
+           `data-motion-parallax="0"`) AND the `.ai-agent-slot` styles —
+           grep confirms.
+        7. `useMotionPreference.ts` composable exists and exports the
+           documented surface. Grep for `useMotionPreference`,
+           `isReduced`, `isFull`, `toggle`, `matchMedia`.
+        8. `useAiAgent.ts` composable exists with the documented state
+           machine + keyboard listener + cleanup pattern.
+        9. `Settings/Appearance.vue` page exists with: 3 radio cards
+           (Sistema/Reduzido/Completo), 3 granular toggles, and live
+           preview card.
+       10. `Settings/Index.vue` (or the settings nav) links to
+           `/settings/appearance`.
+       11. `AppFooter.vue` exists, is mounted in 3 layouts, reads
+           `app_meta.build_version` from Inertia shared props. Footer
+           text contains "© 2026 HDMA Ltda".
+       12. `About.vue` page exists, renders 5 sections, contains
+           "Henrique" and "Microsoft Money" in copy. Rendered inside
+           PublicLayout (not AuthenticatedLayout).
+       13. `Tutorial.vue` lists 6 chapters, each card is a link to
+           `/tutorial/:slug`. The 6 chapter pages exist with interactive
+           demo components and "Ver no Solar" buttons.
+       14. `AiAgentSlot.vue` exists with the documented surface
+           (bubble, panel, input, chip list, loading state). Hidden
+           by default when `features.ai_agent` is false.
+       15. NO backend PHP file was modified by this track:
+           `git diff origin/feature/motion-backend --name-only | grep -E
+           '^app/' | wc -l` must be 0.
+       16. Branch pushed: `git ls-remote origin feature/motion-frontend`.
+
+      Output: PASS / FAIL with specifics.
+    assigned_to: coder
+    role: produce
+    verified_by: verifier
+    depends_on:
+      - motion-backend
+    max_retries: 2
+    timeout_ms: 1500000

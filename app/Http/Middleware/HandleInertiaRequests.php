@@ -74,14 +74,40 @@ class HandleInertiaRequests extends Middleware
             // FASE 4D — build metadata + feature flags surfaced
             // to the front-end. The footer reads build_version
             // and locale; the AI agent slot reads features.ai_agent.
+            //
+            // We wrap AppMeta::get in try/catch because some tests
+            // (e.g. HealthEndpoint's database-unreachable scenario)
+            // deliberately break the default DB connection. The build
+            // version is a build-time constant anyway, so falling
+            // back to the default is the right thing.
             'appMeta' => [
-                'build_version' => AppMeta::get('build_version', '0.11.0'),
-                'locale' => AppMeta::get('locale', 'pt-BR'),
+                'build_version' => $this->safeAppMetaGet('build_version', '0.11.0'),
+                'locale' => $this->safeAppMetaGet('locale', 'pt-BR'),
                 'features' => [
                     'ai_agent' => (bool) config('features.ai_agent', false),
                 ],
             ],
         ];
+    }
+
+    /**
+     * Read a value from the AppMeta key-value store, returning the
+     * default if the table is unavailable (e.g. a test deliberately
+     * broke the default DB connection).
+     *
+     * No caching: AppMeta is a small key-value table consulted on
+     * every Inertia request, but the table is indexed by primary
+     * key `key` and the row count is tiny (locale + build_version
+     * + maybe 2-3 more). Querying it twice per request is fine and
+     * avoids stale-cache issues across test boundaries.
+     */
+    private function safeAppMetaGet(string $key, mixed $default = null): mixed
+    {
+        try {
+            return AppMeta::get($key, $default);
+        } catch (\Throwable $e) {
+            return $default;
+        }
     }
 
     /**

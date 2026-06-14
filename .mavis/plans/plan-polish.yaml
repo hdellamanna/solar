@@ -1,0 +1,517 @@
+version: 1
+plan:
+  name: 'Solar Polish v0.10.0 — observability, resilience, refactor, UX'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 4
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+
+tasks:
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 1: Backend — BearerTokenService refactor + rate limiting + observability
+  # ───────────────────────────────────────────────────────────────────────
+  - id: backend-impl
+    title: 'Backend: BearerTokenService refactor + 6 rate limiters + structured JSON logging + health endpoint + RequestId middleware'
+    assigned_to: coder
+    verified_by: verifier
+    timeout_ms: 1500000
+    prompt: |
+      You are implementing the BACKEND polish for Solar Money v0.10.0.
+      The full design is in `docs/fase-polish/design.md` — READ IT FIRST,
+      top to bottom. Do not skim.
+
+      ## Worktree setup (CRITICAL — read carefully)
+
+      Use a dedicated worktree. The vendor/ dir in this repo is a symlink to
+      /tmp/solar/vendor. Fix it BEFORE running anything:
+
+        cd /tmp/solar
+        git worktree add /tmp/solar-polish-backend feature/polish-backend
+        cd /tmp/solar-polish-backend
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      Do NOT `composer install` in the worktree — it will time out.
+      The cp -R trick is fast (~5s) and identical to main's vendor.
+
+      All your work happens in /tmp/solar-polish-backend. Push the branch
+      when done. Do NOT touch /tmp/solar directly.
+
+      ## Forbidden debugging paths (LESSONS LEARNED)
+
+      - DO NOT grep anything under vendor/ or read Laravel framework source.
+      - DO NOT delete the worktree while the branch is checked out.
+      - DO NOT touch Vue files (frontend track owns them).
+      - DO NOT touch test files in tests/Feature/Auth/ (test track owns
+        new tests, and existing 261 tests must remain green).
+      - DO NOT use `Illuminate\Support\Facades\Str` (Laravel 13 removed
+        the facade — use `Illuminate\Support\Str` for the static helper).
+        PR2 hit this exact trap.
+      - DO NOT poll, sleep, or wait for CI. Push and exit.
+
+      ## Scope (backend only)
+
+        1. `app/Services/Auth/BearerTokenService.php` (new) — the single
+           owner of the token lifecycle. Methods:
+           - `mint(User $user, string $purpose, ?Closure $metaCallback = null): array`
+             Returns `['raw' => string, 'row' => EmailVerificationToken]`.
+             Persists the row with `purpose`, SHA-256 hash of the raw
+             token, 60-min expiry, and the result of
+             `$metaCallback($row, $raw)` stored in the existing `meta`
+             JSON column.
+           - `consume(string $rawToken, string $purpose, Closure $handler): mixed`
+             Throws `InvalidTokenException` on bad/expired/used. On
+             success: marks the token consumed, calls
+             `$handler($row, $user)` with the resolved user.
+           - `canResend(string $email, string $purpose): bool` —
+             1-per-30s + max-5-per-hour throttle.
+           - `resendThrottleKey(string $email, string $purpose): string`.
+           REUSE `EmailVerificationToken::hashToken()`,
+           `scopeForPurpose()`, `generateForUser()` — do NOT create new
+           hash/lookup logic.
+
+        2. Rewrite `app/Services/Auth/EmailVerificationService.php` as
+           a thin adapter over `BearerTokenService`. PUBLIC SURFACE
+           MUST STAY THE SAME (same method names, same signatures,
+           same return types). All existing tests must pass without
+           modification.
+
+        3. Same for `app/Services/Auth/PasswordResetService.php`.
+
+        4. Same for `app/Services/Auth/TwoFactorEnrollmentService.php`.
+           Note: this service's `confirmEnable` / `confirmDisable`
+           methods own the post-consume action (e.g. encrypting
+           the TOTP secret, wiping recovery codes). The closure
+           pattern in `BearerTokenService::consume()` is the
+           right place to inject that logic.
+
+        5. `app/Logging/RequestIdProcessor.php` (new) — reads
+           `X-Request-Id` from the request (or generates a UUIDv4
+           if missing), adds it to every Monolog record as the
+           `request_id` extra.
+
+        6. `app/Http/Middleware/InjectRequestId.php` (new) — runs
+           before `HandleInertiaRequests`. Generates / reads
+           `X-Request-Id` and:
+             - Sets it on the response headers.
+             - Calls `Log::shareContext(['request_id' => $id])` so every
+               log line in the request lifecycle carries it.
+             - Stores it in `$request->attributes` for downstream
+               middleware to read.
+
+        7. `app/Http/Controllers/HealthController.php` (new) —
+           `__invoke()` returns JSON with 4 bounded checks
+           (database, queue, mail, storage). 200 if all green,
+           503 if any is degraded. Each check is wrapped in a
+           2-second timeout.
+
+        8. `config/logging.php` — add a new `structured` channel:
+             - driver: monolog
+             - handler: StreamHandler
+             - formatter: Monolog\Formatter\JsonFormatter
+             - stream: storage_path('logs/structured.log')
+             - processors: [RequestIdProcessor::class,
+               PsrLogMessageProcessor::class]
+           Add a `stack` channel that includes both `single` and
+           `structured` (so existing log calls still work AND
+           the new JSON channel gets every record).
+
+        9. `config/rate-limits.php` (new) — read 6 env vars:
+           RATE_LIMIT_VERIFY_PER_MIN (default 10),
+           RATE_LIMIT_FORGOT_PER_MIN (default 5),
+           RATE_LIMIT_RESET_PER_MIN (default 5),
+           RATE_LIMIT_2FA_CHALLENGE_PER_MIN (default 10),
+           RATE_LIMIT_2FA_RECOVERY_PER_MIN (default 3),
+           RATE_LIMIT_LOGIN_PER_MIN (default 10).
+
+       10. `bootstrap/app.php` — register 6 named limiters in
+           `->withMiddleware(function (Middleware $middleware) { ... })`:
+           ```
+           $middleware->throttleApi();  // 60/min baseline
+           $middleware->throttle('verify', 'verify');
+           $middleware->throttle('forgot', 'forgot-password');
+           $middleware->throttle('reset', 'reset-password');
+           $middleware->throttle('2fa-challenge', 'two-factor.challenge');
+           $middleware->throttle('2fa-recovery', 'two-factor.challenge');
+           $middleware->throttle('login', 'login');
+           ```
+           The throttles are per-IP via `Limit::perMinute(...)->by($r->ip())`.
+           Also register the global `InjectRequestId` middleware in
+           the `web` group BEFORE `HandleInertiaRequests`. Override
+           the default `/up` route by registering a `health` alias
+           pointing to `HealthController`.
+
+       11. `routes/web.php` — add `->middleware('throttle:NAME')` to
+           the 6 routes (login, verify/resend, forgot-password POST,
+           reset-password POST, two-factor.challenge POST). Keep
+           the `signed` middleware on the 2FA confirm routes as it
+           is (PR3 lesson — those need signature validation).
+
+       12. `app/Http/Middleware/HandleInertiaRequests.php` —
+           add `requestId` to the shared Inertia props so the
+           front-end can display it in support flows.
+
+       13. `.env.example` — add:
+             - `LOG_STACK=single,structured`
+             - `LOG_REQUEST_HEADER=X-Request-Id`
+             - `RATE_LIMIT_VERIFY_PER_MIN=10`
+             - `RATE_LIMIT_FORGOT_PER_MIN=5`
+             - `RATE_LIMIT_RESET_PER_MIN=5`
+             - `RATE_LIMIT_2FA_CHALLENGE_PER_MIN=10`
+             - `RATE_LIMIT_2FA_RECOVERY_PER_MIN=3`
+             - `RATE_LIMIT_LOGIN_PER_MIN=10`
+             - `SENTRY_LARAVEL_DSN=` (empty = disabled)
+
+       14. `composer.json` — add `"sentry/sentry-laravel": ^4.0`
+           to `require`. It's only active when `SENTRY_LARAVEL_DSN`
+           is set; empty = zero behavior change. (The package reads
+           the DSN at boot; if empty, it's a no-op.)
+
+       15. `README.md` — update the "Current status" section from
+           "FASE 5 delivered" to v0.9.0 reality. Add a small
+           "Observability & resilience" section at the bottom
+           describing the new logging, rate limit, and health
+           check infrastructure. Keep the existing FASE 1-6
+           sections intact (just update the "Current status"
+           line).
+
+      ## Quality bar
+
+      - Public surface of `EmailVerificationService`,
+        `PasswordResetService`, `TwoFactorEnrollmentService` is
+        UNCHANGED. All 261 existing tests must pass without
+        modification.
+      - Mirror the PR1/PR2/PR3 patterns: use the existing
+        `EmailVerificationToken` model for all token storage.
+      - Never log raw tokens / TOTP secrets / recovery codes /
+        passwords.
+      - SHA-256 hash before storing.
+      - Request ID format: `req_` + 32 hex chars (UUIDv4 without
+        hyphens).
+      - The `BearerTokenService::consume()` closure receives
+        `(EmailVerificationToken $row, User $user)`.
+      - Health endpoint checks are isolated — one check failing
+        doesn't abort the others.
+      - Throttle responses include `Retry-After` header (Laravel
+        does this automatically for `throttle` middleware).
+
+      ## Commit + push
+
+      Commit messages in English. Set git config locally:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+
+      Stage, commit (one commit per logical concern — BearerTokenService
+      + adapters, rate limiting, logging, health, README — or one
+      squash commit if cleaner), then:
+        git push -u origin feature/polish-backend
+
+      ## When done
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, commit hashes, test result summary
+      (run `php artisan test` — must be 261/261 still green).
+      Branch URL, anything notable.
+
+      Push the branch BEFORE you run out of time.
+
+    verify_prompt: |
+      Re-derive correctness — do NOT just re-read the producer's diff.
+
+      Setup:
+        cd /tmp/solar-polish-backend
+        ls -la vendor | head -3
+        grep "APP_BASE_PATH" .env
+        /opt/homebrew/opt/php@8.4/bin/php artisan migrate --env=testing --force
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+
+      Mandatory checks:
+        1. `php artisan test` → 261/261 green, 0 failures. All
+           pre-existing tests pass without modification.
+        2. `BearerTokenService` is the ONLY place where new SHA-256
+           hash logic lives. Grep `hash('sha256'` in `app/Services/Auth/`
+           — should only appear in `BearerTokenService.php` (or in
+           `EmailVerificationToken` model, which is the existing
+           helper). The 3 thin adapters must NOT have their own
+           `hash('sha256'...)` calls.
+        3. `routes:list` shows 6 routes with `throttle:` middleware:
+           login, verify/resend, forgot-password, reset-password,
+           two-factor.challenge. Grep `route:list | grep -i throttle`
+           to confirm.
+        4. `/up` is aliased to `HealthController`. Hit it:
+           `curl -s http://localhost:8000/up -H 'Accept: application/json'`
+           (after `php artisan serve &`) should return JSON with
+           `status: ok` and 4 `checks` keys.
+        5. The 6 rate limiters are registered in `bootstrap/app.php`.
+           Grep `RateLimiter::for` — should return 6 occurrences
+           (verify, forgot, reset, 2fa-challenge, 2fa-recovery, login).
+        6. `InjectRequestId` middleware runs before
+           `HandleInertiaRequests` in the web group. Hit any
+           endpoint with `curl -i -H 'X-Request-Id: test_abc'` and
+           confirm the response has the same `X-Request-Id: test_abc`
+           header (or a generated one if missing).
+        7. `storage/logs/structured.log` gets created on the first
+           structured log call. Trigger an exception, then check
+           `tail -n1 storage/logs/structured.log` — should be a
+           single-line JSON with `request_id`, `level`, `message`.
+        8. The `config/logging.php` has a `structured` channel
+           that uses `JsonFormatter`. Verify with:
+           `php artisan tinker --execute='echo config("logging.channels.structured.formatter");'`
+           (or grep the config file).
+        9. The 3 existing services' public method signatures are
+           UNCHANGED. Grep the public surface:
+             - `EmailVerificationService::sendVerification(User $u)`
+             - `EmailVerificationService::verify(string $raw): bool`
+             - `PasswordResetService::requestReset(string $email): bool`
+             - `PasswordResetService::resetPassword(string $raw, string $new): User`
+             - `TwoFactorEnrollmentService::beginEnable(User $u): void`
+             - `TwoFactorEnrollmentService::beginDisable(User $u): void`
+             - `TwoFactorEnrollmentService::confirmEnable(string $raw, string $code): User`
+             - `TwoFactorEnrollmentService::confirmDisable(string $raw, string $password): User`
+        10. `composer.json` lists `sentry/sentry-laravel`. Grep
+            `grep sentry composer.json`.
+        11. `.env.example` documents the 6 RATE_LIMIT_* vars and
+            `LOG_STACK=single,structured`.
+        12. `README.md` "Current status" no longer says
+            "FASE 5 delivered" — it now reflects v0.9.0.
+        13. NO Vue file was modified by this track:
+            `git diff main --name-only | grep -E '\.vue$' | wc -l` must be 0.
+        14. NO test file was added or modified by this track
+            (the new tests go in the frontend-and-tests track):
+            `git diff main --name-only | grep -E 'Test\.php$' | wc -l` must be 0.
+        15. Branch pushed: `git ls-remote origin feature/polish-backend`
+            returns a SHA newer than the design doc commit.
+
+      Output: PASS / FAIL with line-numbered specifics.
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 2: Frontend + Tests — UX polish + 17 dedicated tests
+  # (combined to save quota)
+  # ───────────────────────────────────────────────────────────────────────
+  - id: frontend-and-tests
+    title: 'Frontend: mesh canvas on 2FA pages + hold-to-confirm button + 17 dedicated tests (4 health, 6 rate limit, 5 bearer token, 2 challenge rate)'
+    assigned_to: coder
+    verified_by: verifier
+    depends_on: [backend-impl]
+    timeout_ms: 1500000
+    prompt: |
+      You are implementing the FRONTEND polish and the 17 new
+      dedicated tests for Solar Money v0.10.0. The full design is
+      in `docs/fase-polish/design.md` — READ IT FIRST, top to bottom.
+
+      ## Worktree setup
+
+      Use a dedicated worktree that branches off `feature/polish-backend`
+      (the backend track's branch), so you have the full backend in
+      place:
+
+        cd /tmp/solar
+        git fetch origin feature/polish-backend
+        git worktree add /tmp/solar-polish-frontend feature/polish-frontend
+        cd /tmp/solar-polish-frontend
+        git merge origin/feature/polish-backend --no-edit
+
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      All your work happens here. Push the branch when done.
+
+      ## Vendor worktree issue (same as backend track)
+
+      vendor/ is a symlink to /tmp/solar/vendor by default. The cp -R +
+      APP_BASE_PATH trick above fixes it. Do NOT `composer install` in the
+      worktree.
+
+      ## Forbidden paths
+
+      - DO NOT grep vendor/ or read framework source.
+      - DO NOT touch backend PHP files (services, controllers, middleware,
+        routes, providers, mail, config, composer.json) — the backend
+        track owns them.
+      - DO NOT delete the worktree or the branch.
+      - DO NOT use `router.X()` from @inertiajs/vue3 — use `useForm()`.
+
+      ## Scope (frontend + tests)
+
+        ### Frontend (Vue files)
+
+        1. `resources/js/Components/ConfirmHoldButton.vue` (new) —
+           reusable hold-to-confirm button. 3-second hold, animated
+           progress bar, "Segure por 3 segundos para confirmar" copy.
+           Emits `confirmed` event when held the full duration.
+           Disable via `disabled` prop. Apple-style slide aesthetic.
+
+        2. `resources/js/Pages/Auth/TwoFactorChallenge.vue` —
+           wrap in mesh canvas (use `<GuestLayout>` which already
+           has the mesh global, but ensure the form card is `.glass`
+           on top of the mesh). Move the "Trust this device" checkbox
+           ABOVE the TOTP code field with clearer label "Confiar
+           neste dispositivo por 90 dias". Add a prominent success
+           toast on the post-challenge redirect.
+
+        3. `resources/js/Pages/Auth/TwoFactorEnableConfirm.vue` —
+           mesh canvas wrapper. Better copy. Status pill at the
+           top showing "Etapa 2 de 2" progress.
+
+        4. `resources/js/Pages/Auth/TwoFactorDisableConfirm.vue` —
+           replace the regular submit button with
+           `<ConfirmHoldButton>` for the 3-second hold-to-confirm.
+
+        5. `resources/js/Pages/Settings/Security.vue` — status pill
+           (green "Ativado" / amber "Desativado" / red
+           "Desativando..."). "Última verificação: há X minutos" when
+           2FA enabled. Recovery code count "X de 10 códigos restantes".
+           When <3 codes, show a placeholder for "Regenerar códigos"
+           (out of scope for v0.10.0, just the UI; the actual
+           regeneration endpoint is v0.11+).
+
+        6. `resources/js/Pages/Settings/Index.vue` — add a "Segurança"
+           card linking to `/settings/security`. If it already
+           exists, this is a no-op.
+
+        7. `resources/js/Layouts/GuestLayout.vue` — confirm the mesh
+           canvas is rendering through (z-index, no overlay
+           eating the mesh). If the existing layout is fine, no-op.
+           Document the change in deliverable.md.
+
+        8. `resources/css/app.css` — add (or extend) a `.status-pill`
+           utility: 3 variants (`.status-pill--ok` / `--warn` / `--err`),
+           pill shape, subtle glow.
+
+        ### Tests (17 new cases in 4 files)
+
+        Use Laravel's testing helpers: `$this->post()`, `Mail::fake()`,
+        `Event::fake()`, `Hash::make()`, `Carbon::setTestNow()` /
+        `travel()`, `Cache::flush()` in setUp for any throttle state.
+
+        File 1: `tests/Feature/Auth/HealthEndpointTest.php` (4 cases)
+          - test_health_endpoint_returns_ok_when_all_systems_healthy
+          - test_health_endpoint_returns_degraded_when_database_unreachable
+          - test_health_endpoint_returns_degraded_when_mail_unreachable
+          - test_health_endpoint_includes_request_id_in_response
+
+        File 2: `tests/Feature/Auth/RateLimitTest.php` (6 cases)
+          - test_login_route_respects_per_minute_limit
+          - test_verify_resend_route_respects_per_minute_limit
+          - test_forgot_password_route_respects_per_minute_limit
+          - test_reset_password_route_respects_per_minute_limit
+          - test_two_factor_challenge_route_respects_per_minute_limit
+          - test_two_factor_recovery_code_respects_stricter_per_minute_limit
+
+          Each test: hit the route 11 times rapidly (or 4 times
+          for the 3-per-minute recovery limit). Assert the 11th / 4th
+          request gets a 429 with a `Retry-After` header.
+
+        File 3: `tests/Feature/Auth/BearerTokenServiceTest.php` (5 cases)
+          - test_mint_persists_row_with_correct_purpose_and_meta
+          - test_consume_throws_on_bad_token
+          - test_consume_throws_on_expired_token
+          - test_consume_throws_on_consumed_token
+          - test_can_resend_throttles_at_one_per_30s_and_five_per_hour
+
+        File 4: Extend `tests/Feature/Auth/TwoFactorChallengeTest.php`
+          with 2 new cases (total 9):
+          - test_challenge_429_when_recovery_code_hits_per_minute_limit
+          - test_challenge_429_when_totp_hits_per_minute_limit
+
+        ## Quality bar
+
+      - Vue 3 `<script setup>` + Composition API.
+      - pt-BR for ALL user-facing strings. Code comments + commit
+        messages in English.
+      - No console.log in production Vue.
+      - Use `useForm`, never `router.post`.
+      - `ConfirmHoldButton.vue` is reusable — it accepts a slot
+        for the label and a `:seconds` prop (default 3).
+      - The mesh canvas is global via `app.blade.php` — don't
+        try to re-render it per page.
+      - The recovery-code-per-minute test must hit the rate
+        limit at the 4th request (3/min); the other tests at
+        the 11th (10/min). 2FA challenge TOTP test at 11th.
+      - Test `BearerTokenService` via its public methods only.
+        Do NOT reach into private methods or hit the DB schema
+        directly.
+
+      ## Build + test + commit + push
+
+      Run in order:
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='HealthEndpointTest|RateLimitTest|BearerTokenServiceTest|TwoFactorChallengeTest' --list-tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+        # 278 passing (261 pre-existing + 17 new), 0 fail
+        npm run build
+
+      Then:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+        git add -A
+        git commit -m "polish: 2FA UX + ConfirmHoldButton + 17 dedicated tests (v0.10.0)"
+        git push -u origin feature/polish-frontend
+
+      Take 2 screenshots using the headless Chrome pattern
+      (PR1/PR2/PR3 workers documented this — fallback to
+      `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless --screenshot=...`
+      if Playwright is down):
+        - /tmp/solar-polish-frontend/screen-2fa-challenge.png
+        - /tmp/solar-polish-frontend/screen-2fa-settings.png
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, screenshot paths, commit hashes, test
+      counts, branch URL.
+
+      Push BEFORE you run out of time.
+
+    verify_prompt: |
+      Re-derive correctness.
+
+      Setup:
+        cd /tmp/solar-polish-frontend
+        npm install
+        npm run build
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='HealthEndpointTest|RateLimitTest|BearerTokenServiceTest|TwoFactorChallengeTest' --list-tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+
+      Mandatory checks:
+        1. All 17 new test names exist with EXACT names (use
+           --list-tests to confirm).
+        2. The new 4 files' tests: HealthEndpointTest (4) +
+           RateLimitTest (6) + BearerTokenServiceTest (5) +
+           TwoFactorChallengeTest (2 new) = 17 total.
+        3. `php artisan test` (full suite) → at least 278 pass,
+           0 fail. The 261 pre-existing tests must not regress.
+        4. Open `screen-2fa-challenge.png` and
+           `screen-2fa-settings.png` — must show real, glass-styled
+           pages with mesh canvas visible through.
+        5. `npm run build` exits 0.
+        6. All Vue files are present:
+           Components/ConfirmHoldButton.vue (new),
+           Pages/Auth/TwoFactorChallenge.vue (modified),
+           Pages/Auth/TwoFactorEnableConfirm.vue (modified),
+           Pages/Auth/TwoFactorDisableConfirm.vue (modified),
+           Pages/Settings/Security.vue (modified).
+        7. The `.status-pill` utility class is defined in
+           `resources/css/app.css` with 3 variants.
+        8. NO backend PHP file was modified by this track
+           (the frontend track is Vue + tests only):
+           `git diff main --name-only | grep -E '^app/' | wc -l` must
+           be 0 (or only the new HealthController, BearerTokenService
+           if it slips in, but the diff against main should be 0
+           because backend-impl is on a different branch).
+
+           Wait — re-read carefully. The frontend track branches
+           from feature/polish-backend, so its base IS the backend
+           work. The diff should show changes relative to main for
+           all the backend + frontend work combined. This check is
+           therefore not applicable in the way described. Instead:
+           `git diff origin/feature/polish-backend --name-only | grep
+           -E '^app/' | wc -l` must be 0 (the frontend track added
+           NO backend files on top of the backend track's branch).
+        9. Branch pushed: `git ls-remote origin feature/polish-frontend`.
+
+      Output: PASS / FAIL with specifics.

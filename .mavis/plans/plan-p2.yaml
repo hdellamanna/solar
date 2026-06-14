@@ -1,0 +1,231 @@
+version: 1
+plan:
+  name: 'Solar Auth Phase 2 — Password Reset'
+  max_concurrency: 4
+  max_consecutive_failures: 2
+  max_cycles: 5
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+
+tasks:
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 1: Backend — migration, model, service, controllers, mail, routes
+  # ───────────────────────────────────────────────────────────────────────
+  - id: backend-impl
+    title: 'Backend: purpose migration, PasswordResetService, 2 controllers, mail, routes, AuthTest update'
+    assigned_to: coder
+    timeout_ms: 1800000
+    prompt: |
+      You are implementing the BACKEND half of Solar Money's password reset flow (PR2 of FASE 4D).
+      The full design is in `docs/auth/phase-2/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree to avoid colliding with parallel tracks.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p2-backend feature/auth-p2-backend
+        cd /tmp/solar-auth-p2-backend
+      All your work happens here. Push the branch when done. Do NOT touch /tmp/solar directly.
+
+      Scope (backend only — do NOT touch Vue files, do NOT touch tests/Feature/Auth/PasswordResetTest.php):
+
+        1. `database/migrations/2026_06_12_150000_add_purpose_to_email_verification_tokens.php` — exact schema in design doc (add purpose column with default 'email_verification', update index, add CHECK constraint)
+        2. `app/Models/EmailVerificationToken.php` — add purpose constants (PURPOSE_EMAIL_VERIFICATION, PURPOSE_PASSWORD_RESET), add to fillable, add `scopeForPurpose`, update `generateForUser()` to accept purpose arg
+        3. `app/Services/Auth/PasswordResetService.php` (+ InvalidResetTokenException) — `requestReset`, `resetPassword`, `canRequestReset`. Throttle pattern mirrors EmailVerificationService::canResend (cache key prefix 'password-reset:throttle:')
+        4. `app/Http/Controllers/Auth/PasswordResetLinkController.php` — `create()` (show form) + `store(PasswordResetLinkRequest)` (always returns same success flash, no user enumeration)
+        5. `app/Http/Controllers/Auth/NewPasswordController.php` — `create($token)` (show form, redirect to forgot-password if invalid) + `store(NewPasswordRequest)` (call service, auto-login user after success)
+        6. `app/Http/Requests/Auth/PasswordResetLinkRequest.php` — authorize: false, only `email` (required, email, max 160)
+        7. `app/Http/Requests/Auth/NewPasswordRequest.php` — authorize: false, `token` (required, string) + `password` (required, confirmed, Password::min(8))
+        8. `app/Mail/PasswordResetMail.php` — Mailable with Envelope (subject "Redefina sua senha - Solar Money") + Content (view)
+        9. `resources/views/emails/password-reset.blade.php` (+ text fallback) — Plain HTML email, brand-consistent with verify-email.blade.php
+       10. `routes/web.php` — add 4 routes inside the existing `guest` middleware group. Names: password.request, password.email, password.reset, password.update
+
+      Also: the existing `tests/Feature/AuthTest.php` may have a test that hits a verify URL — the verify token model now has a `purpose` column with a default, so existing verify tokens should still work, but if any test explicitly asserts on the row contents, update it.
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com".
+
+      When done:
+        - `npm run build` and `php artisan test` both pass (226 → ~239 tests; 13 new from PasswordResetTest if backend track adds them, OR keep tests separate)
+        - Push the branch: `git push -u origin feature/auth-p2-backend`
+        - Write `deliverable.md` in your worktree root summarizing: files created/modified, commit hashes, test counts
+        - Do NOT open a PR — the owner (Mavis) will merge after verifier passes
+        - Do NOT wait for CI — the owner monitors CI
+
+      IMPORTANT: do NOT add the 13 feature tests in tests/Feature/Auth/PasswordResetTest.php — that file is the tester's track scope. You may add at most 2-3 sanity tests in AuthTest if existing tests need updates (e.g. the verify token model has a new column), but do NOT write the 13 dedicated tests.
+
+      Lessons from PR1 (READ CAREFULLY):
+        - DO NOT edit /tmp/solar directly. Use the worktree.
+        - DO use word-boundary regex for keyword matching
+        - DO run `php artisan test` locally before committing
+        - DO use `Carbon::setTestNow()` for time-based tests
+        - DO NOT use `dd()`/`dump()` in any code
+        - DO NOT introduce empty `services:` blocks in CI yaml
+        - DO remember: the verifier checks ONLY artifacts in your scope. Tests in PasswordResetTest.php belong to the test-coverage track.
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness — do not just re-read the diff.
+
+      Setup:
+        cd /tmp/solar-auth-p2-backend
+        composer install --no-interaction
+        npm run build
+        php artisan migrate:fresh --seed
+        php artisan test --filter=AuthTest
+
+      Mandatory checks (each must PASS; FAIL with exact error otherwise):
+        1. `php artisan test --filter=AuthTest` — all tests pass, NO regressions
+        2. `php artisan migrate:fresh --seed` then `php artisan route:list | grep -E "password|forgot|reset"` — 4 new routes appear with correct middleware (guest only)
+        3. Try the reset request flow manually: `php artisan tinker --execute='use App\Models\EmailVerificationToken; $t = EmailVerificationToken::first(); var_dump($t->purpose);'` — returns 'email_verification' for the seeded demo
+        4. Create a password reset token via tinker, verify it has purpose='password_reset': `php artisan tinker --execute='use App\Models\EmailVerificationToken; use App\Models\User; use Illuminate\Support\Str; $u = User::factory()->create(["email" => "test+" . time() . "@x.com", "email_verified_at" => now()]); $raw = Str::random(64); $t = EmailVerificationToken::create(["user_id" => $u->id, "purpose" => "password_reset", "token_hash" => hash("sha256", $raw), "expires_at" => now()->addMinutes(60)]); echo $t->purpose;'`
+        5. Try a tampered token: GET `/reset-password/bad-token` should redirect to forgot-password (NOT 500)
+        6. Try a valid token: GET `/reset-password/{raw}` should return 200 with the form
+        7. Diff review: check that PasswordResetService does NOT throw on unknown email (no user enumeration). The `requestReset` method must return true regardless of user existence.
+        8. Diff review: verify the throttle uses cache with the documented key pattern
+        9. Diff review: no hardcoded secrets, no .env commits, no `dd()`/`dump()`
+       10. Verify the table migration up AND down: `migrate:rollback --step=1` then `migrate` — should not error
+       11. Read the email template (password-reset.blade.php) — must be plain HTML with inline CSS, no `<script>`, no external CSS, gradient logo with #FF8A3D → #FFC93C → #7c3aed (or similar Solar Money gradient)
+
+      Output: PASS/FAIL with line numbers and reproduction steps for any failure. Do NOT demand artifacts from the test-coverage track (tests/Feature/Auth/PasswordResetTest.php is their scope).
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 2: Frontend — ForgottenPassword.vue, NewPassword.vue, Login.vue update, email template
+  # ───────────────────────────────────────────────────────────────────────
+  - id: frontend-impl
+    title: 'Frontend: ForgottenPassword view, NewPassword view, Login "Esqueci" link, Resend email template'
+    assigned_to: coder
+    depends_on: [backend-impl]   # needs route names + controller contracts
+    timeout_ms: 1500000
+    prompt: |
+      You are implementing the FRONTEND half of Solar Money's password reset flow (PR2 of FASE 4D).
+      The full design is in `docs/auth/phase-2/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree to avoid colliding with the backend track.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p2-frontend feature/auth-p2-frontend
+        cd /tmp/solar-auth-p2-frontend
+      All your work happens here. Push the branch when done. Do NOT touch /tmp/solar directly.
+
+      This track depends on the backend track only because the route names must exist before you can test. You can READ the backend track's branch (`feature/auth-p2-backend`) in the meantime. If route names diverge from the design doc, follow the design doc.
+
+      Scope (frontend only — do NOT touch migrations, controllers, services, or PasswordResetTest):
+        1. `resources/js/Pages/Auth/ForgottenPassword.vue` — full page inside GuestLayout, heading "Esqueci minha senha", email input (`.input-glass`), submit button "Enviar link de redefinição" (POSTs to `route('password.email')`), success flash from session, back link to login
+        2. `resources/js/Pages/Auth/NewPassword.vue` — full page inside GuestLayout, heading "Criar nova senha", hidden input for `token` (from URL via usePage), new password + confirm (`.input-glass`), submit button "Redefinir senha" (POSTs to `route('password.update')`), error flash for invalid/expired token, link to request a new one
+        3. `resources/js/Pages/Auth/Login.vue` — replace the existing "Esqueci" link's `href="#"` with `:href="route('password.request')"` so it actually navigates
+        4. `resources/views/emails/password-reset.blade.php` (+ password-reset-text.blade.php text fallback) — plain HTML email matching the structure in the design doc, brand-consistent with verify-email.blade.php
+
+      CRITICAL: do NOT use `router.X()` from @inertiajs/vue3. Use `useForm()` for all form submissions (PR1 lesson — Inertia 3.x tree-shaking breaks the named `router` import and crashes the page).
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com".
+
+      When done:
+        - `npm run build` passes
+        - Take 2 screenshots: `screen-forgot-password.png` and `screen-new-password.png` using the existing playwright setup
+        - Push the branch: `git push -u origin feature/auth-p2-frontend`
+        - Write `deliverable.md` summarizing: files created/modified, screenshot paths, any deviations
+        - Do NOT open a PR
+
+      Lessons from PR1 (READ CAREFULLY):
+        - DO NOT edit /tmp/solar directly. Use the worktree.
+        - DO use the existing CSS design tokens (primary, solar, ink, .btn-primary, .input-glass)
+        - DO keep email template plain HTML — no backdrop-filter, no JS frameworks, no external CSS
+        - DO use `useForm` for ALL form posts, never `router.post()`
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness — do not just re-read the diff.
+
+      Setup:
+        cd /tmp/solar-auth-p2-frontend
+        composer install --no-interaction
+        npm install
+        npm run build
+
+      Mandatory checks:
+        1. Open the screenshots: `/tmp/solar-auth-p2-frontend/screen-forgot-password.png` and `screen-new-password.png` — verify they show real, glass-styled forms
+        2. Render check: `php artisan view:clear` then grep the password-reset.blade.php for forbidden tags: no `<script>`, no external CSS — must be inline only
+        3. Check that ForgottenPassword.vue uses `route('password.email')` (not hardcoded URL)
+        4. Check that NewPassword.vue reads the token from usePage (URL param) and POSTs to `route('password.update')` via `useForm` (NOT `router.post`)
+        5. Check the Login.vue "Esqueci" link now points to `route('password.request')`
+        6. Check the email template has the orange→yellow→violet gradient logo
+        7. Check that all 4 files in scope are modified, no others
+        8. Diff review: any `console.log` should not exist in production Vue. Any `dump()` or `dd()` calls. Any `router.X()` direct calls (would crash on Inertia 3.x).
+
+      Output: PASS/FAIL with specific issues.
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 3: Tests — 13 feature tests for password reset flow
+  # ───────────────────────────────────────────────────────────────────────
+  - id: test-coverage
+    title: 'Test coverage: 13 feature tests for password reset flow + regression check on verify'
+    assigned_to: coder
+    depends_on: [backend-impl]
+    timeout_ms: 1500000
+    prompt: |
+      You are writing the test suite for Solar Money's password reset (PR2 of FASE 4D).
+      The full design and test list is in `docs/auth/phase-2/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p2-tests feature/auth-p2-tests
+        cd /tmp/solar-auth-p2-tests
+      All your work happens here. Push the branch when done.
+
+      Scope (tests only):
+        1. `tests/Feature/Auth/PasswordResetTest.php` — write the 13 tests listed in the design doc:
+           - test_user_can_request_password_reset_link
+           - test_password_reset_request_does_not_reveal_user_existence
+           - test_password_reset_request_throttles_to_one_per_30s
+           - test_password_reset_request_caps_at_5_per_hour
+           - test_password_reset_link_marks_token_consumed_on_use
+           - test_password_reset_link_expires_after_60_minutes
+           - test_password_reset_link_cannot_be_reused
+           - test_password_reset_invalidates_other_active_tokens
+           - test_password_reset_does_not_block_unverified_users
+           - test_password_reset_loglocks_user_in_after_success
+           - test_password_reset_email_contains_signed_url
+           - test_old_email_verification_tokens_still_work (regression)
+           - test_invalid_token_redirects_to_forgot_password_with_error
+
+        2. Do NOT modify any other files in the backend track's scope. Do NOT modify the existing `tests/Feature/AuthTest.php` unless absolutely required for a regression; if you do, document the change in the deliverable.
+
+      Use Laravel's testing helpers: `$this->post()`, `Mail::fake()`, `Event::fake()`, `Hash::make()`, `Carbon::setTestNow()` for time travel, `Cache::flush()` in setUp for throttling tests.
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com".
+
+      When done:
+        - `php artisan test --filter=PasswordResetTest` — all 13 pass
+        - `php artisan test` — all 239+ pass (no regressions)
+        - Push the branch: `git push -u origin feature/auth-p2-tests`
+        - Write `deliverable.md` summarizing: test counts, branch
+
+      Lessons:
+        - DO use `Carbon::setTestNow()` for time travel (don't sleep())
+        - DO use `Mail::fake()` to capture emails without actually sending
+        - DO check the design doc for exact test names — match exactly
+        - DO test the regression test (#12) explicitly to confirm the PR1 email verification flow still works with the new `purpose` column
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness.
+
+      Setup:
+        cd /tmp/solar-auth-p2-tests
+        composer install --no-interaction
+        php artisan test --filter=PasswordResetTest
+        php artisan test
+
+      Mandatory checks:
+        1. All 13 tests listed in the design doc exist with the exact names. Run `php artisan test --filter=PasswordResetTest --list-tests` to confirm.
+        2. Each test is INDEPENDENT — none of them depend on shared state, all create their own users via factory or firstOrCreate.
+        3. Time-based tests (60min expiry) use `Carbon::setTestNow()` or `travel()` — they should NOT use `sleep()`.
+        4. The throttle test sends 6+ resets and asserts the 6th is rate-limited.
+        5. The expired token test uses `Carbon::setTestNow(now()->addMinutes(61))` or similar.
+        6. The "does not reveal user existence" test asserts that BOTH the known-email and unknown-email cases produce the same HTTP status and same flash message.
+        7. The regression test (#12) creates a verify email token, asserts it works end-to-end (request link → click → verified).
+        8. NO test uses `dd()`, `dump()`, or `var_dump()`. NO test logs sensitive data (tokens, passwords, emails).
+        9. NO test imports classes it doesn't use.
+       10. The AuthTest update correctly follows the new flow (verify still works after the purpose column was added).
+       11. Run the FULL test suite: `php artisan test` — should be 239+ passing, 0 failing.
+
+      Output: PASS/FAIL with specific test numbers that fail.

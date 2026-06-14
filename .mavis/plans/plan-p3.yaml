@@ -1,0 +1,516 @@
+version: 1
+plan:
+  name: 'Solar Auth Phase 3 — 2FA + Trusted Devices (PR3 of FASE 4D)'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 4
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+
+tasks:
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 1: Backend — full PHP layer
+  # ───────────────────────────────────────────────────────────────────────
+  - id: backend-impl
+    title: 'Backend: 2FA + trusted devices — migration, 3 services, 4 controllers, 4 requests, 2 mail, 2 emails, routes, middleware'
+    assigned_to: coder
+    verified_by: verifier
+    timeout_ms: 1500000   # 25 min hard cap
+    prompt: |
+      You are implementing the BACKEND half of Solar Money's 2FA + trusted
+      devices flow (PR3 of FASE 4D). The full design is in
+      `docs/auth/phase-3/design.md` — READ IT FIRST, top to bottom. Do not skim.
+
+      ## Worktree setup (CRITICAL — read carefully)
+
+      Use a dedicated worktree. The vendor/ dir in this repo is a symlink to
+      /tmp/solar/vendor, which makes Laravel's test framework infer the wrong
+      basePath. Fix it BEFORE running phpunit or the new test files (test
+      track will reuse this branch):
+
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p3-backend feature/auth-p3-backend
+        cd /tmp/solar-auth-p3-backend
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      Do NOT `composer install` in the worktree — it will time out. The cp -R
+      trick is fast (~5s) and identical to main's vendor.
+
+      After worktree is bootstrapped, run `composer require pragmarx/google2fa-laravel`
+      (the new TOTP dependency from the design). Then cp -R vendor + dump-autoload
+      again so the new package's classmap is reflected.
+
+      All your work happens in /tmp/solar-auth-p3-backend. Push the branch when
+      done. Do NOT touch /tmp/solar directly.
+
+      ## Forbidden debugging paths (LESSON LEARNED)
+
+      - DO NOT `grep` anything under vendor/ or read Laravel framework source.
+      - DO NOT delete the worktree while the branch is checked out.
+      - DO NOT touch Vue files (frontend track owns them).
+      - DO NOT touch tests/Feature/Auth/TwoFactor*Test.php files (test track owns them).
+      - DO NOT use `Illuminate\Support\Facades\Str` (Laravel 13 removed the
+        facade — use `Illuminate\Support\Str` for the static helper class).
+        PR2 hit this exact trap; the import must be the helper class.
+      - DO NOT poll, sleep, or wait for CI. You are a producer — push and exit.
+
+      ## Scope (backend only)
+
+        1. `composer.json` — add `pragmarx/google2fa-laravel: ^2.0`. Run
+           `composer update` (NOT `composer install`).
+
+        2. `database/migrations/2026_06_12_180000_add_two_factor_to_users_and_devices.php`
+           per design doc: extend the `purpose` CHECK constraint on
+           `email_verification_tokens` to include `'two_factor_enroll'` and
+           `'two_factor_disable'`, then create `user_two_factor`,
+           `user_recovery_codes`, `trusted_devices` tables.
+
+        3. `app/Models/UserTwoFactor.php` — thin Eloquent wrapper, fillable
+           includes `user_id`, `secret_encrypted`, `last_counter`,
+           `enabled_at`, `confirmed_at`. Has `user()` relation.
+
+        4. `app/Models/RecoveryCode.php` — fillable `user_id`, `code_hash`,
+           `consumed_at`. `isConsumed()`, `markConsumed()`.
+
+        5. `app/Models/TrustedDevice.php` — fillable per design. `isExpired()`,
+           `touchSeen()`, `verify($validator): bool` (SHA-256 compare).
+
+        6. `app/Models/User.php` — add `twoFactor()`, `recoveryCodes()`,
+           `trustedDevices()` relations; `hasTwoFactorEnabled()`,
+           `isTwoFactorVerified()` (session-based), `markTwoFactorVerified()`,
+           `clearTwoFactorVerified()`.
+
+        7. `app/Services/Auth/TwoFactorService.php` — `generateSecret()`,
+           `currentOtp()`, `verifyCode($encryptedSecret, $code, &$newCounter): bool`
+           (±1 window), `provisioningUri()`, `encryptSecret()`,
+           `decryptSecret()` (via `Crypt::encryptString` /
+           `decryptString`).
+
+        8. `app/Services/Auth/TrustedDeviceService.php` — `issue()`,
+           `revokeAll()`, `revokeOne()`, `verify()`, `cleanup()`.
+
+        9. `app/Services/Auth/TwoFactorEnrollmentService.php` —
+           `beginEnable()`, `confirmEnable($rawToken, $totpCode): User`,
+           `beginDisable()`, `confirmDisable($rawToken, $password): User`.
+           REUSE the existing `EmailVerificationToken::generateForUser()`,
+           `hashToken()`, `scopeForPurpose()` helpers from PR1 — do NOT
+           create new hash/lookup logic.
+
+       10. `app/Http/Middleware/EnsureTwoFactorVerified.php` — alias `two_factor`.
+           Reads user, checks `hasTwoFactorEnabled()`. If enabled and not
+           session-verified and no trusted-device cookie match, redirects to
+           `route('two-factor.challenge')` with flash "Confirme o código 2FA".
+           Exempts `two-factor.*` and `logout`.
+
+       11. `app/Http/Controllers/Auth/TwoFactorChallengeController.php` —
+           `create()` (show challenge form) + `store(VerifyTwoFactorRequest)`
+           (try TOTP, then recovery code; set session flag; optionally issue
+           trusted-device cookie if checkbox checked; redirect to dashboard).
+
+       12. `app/Http/Controllers/Auth/TwoFactorEnableController.php` —
+           `beginEnable(Request)` (auth required, mints enroll token, emails
+           the link) + `confirmEnable(string $token)` (GET, no auth, returns
+           Vue page with `{secret, qrUri, token}` props) +
+           `confirmEnableStore(ConfirmTwoFactorEnableRequest)` (POST, no auth,
+           takes `{token, code}`, persists encrypted secret + 10 recovery codes,
+           marks token consumed).
+
+       13. `app/Http/Controllers/Auth/TwoFactorDisableController.php` —
+           `beginDisable(BeginTwoFactorDisableRequest)` (auth required, takes
+           password, mints disable token, emails link) + `confirmDisable(string $token)`
+           (GET, no auth, returns Vue page) + `confirmDisableStore(ConfirmTwoFactorDisableRequest)`
+           (POST, no auth, takes `{token, password}`, wipes secret + recovery
+           codes + trusted devices, logs user out via `Auth::logout()`,
+           redirects to `/login` with success flash).
+
+       14. `app/Http/Controllers/Auth/TrustedDeviceController.php` —
+           `destroy(Request, int $id)` (auth required, revoke one),
+           `destroyAll(Request)` (auth required, revoke all + clear cookie).
+
+       15. `app/Http/Requests/Auth/VerifyTwoFactorRequest.php` — `authorize(): true`,
+           only `code` (required, string, min 6, max 10) and `trust_device` (boolean,
+           nullable/optional).
+
+       16. `app/Http/Requests/Auth/ConfirmTwoFactorEnableRequest.php` —
+           `authorize(): true`, `token` (required, string) + `code` (required, string,
+           digits between 0-9, size 6).
+
+       17. `app/Http/Requests/Auth/BeginTwoFactorDisableRequest.php` —
+           `authorize(): true`, `password` (required, current password rule via
+           `current_password` validation).
+
+       18. `app/Http/Requests/Auth/ConfirmTwoFactorDisableRequest.php` —
+           `authorize(): true`, `token` (required, string) + `password` (required,
+           current_password rule).
+
+       19. `app/Mail/TwoFactorEnableMail.php` — Mailable. Envelope subject
+           "Ativar verificacao em duas etapas - Solar Money" (ASCII-only).
+           Content view = `emails.two-factor-enable`. Receives `user` + `url`
+           (signed URL with 60-min TTL).
+
+       20. `app/Mail/TwoFactorDisableMail.php` — Mailable. Envelope subject
+           "Desativar verificacao em duas etapas - Solar Money" (ASCII-only).
+           Content view = `emails.two-factor-disable`. Receives `user` + `url`.
+
+       21. `resources/views/emails/two-factor-enable.blade.php` — Plain HTML
+           matching the brand (Solar Money gradient logo, CTA button "Ativar
+           2FA", fallback URL, security footnote). Inline CSS only.
+
+       22. `resources/views/emails/two-factor-disable.blade.php` — Plain HTML
+           matching the brand (CTA button "Desativar 2FA", warning tone).
+
+       23. `routes/web.php` — add the 2FA route group + the 2 email-confirmed
+           GET routes outside auth, per design doc.
+
+       24. `bootstrap/app.php` — register the `two_factor` middleware alias.
+
+      ## Quality bar
+
+      - Mirrors PR1/PR2 patterns: read `app/Services/Auth/EmailVerificationService.php`
+        and `app/Services/Auth/PasswordResetService.php` for shape.
+      - Use the existing `EmailVerificationToken` model's `generateForUser`,
+        `hashToken`, `scopeForPurpose` helpers — do NOT duplicate the
+        SHA-256-hash logic.
+      - Never log raw tokens / TOTP secrets / recovery codes.
+      - SHA-256 hash before storing TOTP secret is `Crypt::encryptString`
+        (NOT a plain hash — we need reversible encryption so we can
+        re-verify codes).
+      - SHA-256 hash recovery codes (one-way).
+      - TOTP replay protection: `last_counter` field prevents the same
+        30s step from being accepted twice.
+      - Trusted-device cookie: `solar_trusted`, httpOnly, secure (when
+        over HTTPS), sameSite=Lax, 90-day expiry.
+      - Cookie value format: `selector:validator` (32 bytes selector,
+        64 bytes validator, both base64url-encoded).
+      - Disable flow: 2FA wiped, recovery codes wiped, trusted devices
+        wiped, user logged out.
+
+      ## Commit + push
+
+      Commit messages in English. Set git config locally:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+
+      Stage, commit (one commit per logical concern: composer dep,
+      migration, models, services, controllers, mail, routes — or one
+      squash commit if cleaner), then:
+        git push -u origin feature/auth-p3-backend
+
+      ## When done
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, commit hashes, test result summary (run
+      `php artisan test --filter='AuthTest|EmailVerificationTest|PasswordResetTest'`
+      — must be 239/239 still green; the 2FA + trusted-devices tests
+      belong to the test track and will not exist yet), branch URL.
+
+      Push the branch BEFORE you run out of time. A pushed branch is a
+      saved branch.
+
+      HANDS OFF the Vue/frontend files. HANDS OFF the 2FA + trusted
+      device test files.
+
+    verify_prompt: |
+      Re-derive correctness — do NOT just re-read the producer's diff.
+
+      Setup:
+        cd /tmp/solar-auth-p3-backend
+        ls -la vendor | head -3               # must be a real dir, not symlink
+        grep "APP_BASE_PATH" .env             # should be set
+        /opt/homebrew/opt/php@8.4/bin/php artisan migrate --env=testing --force
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='AuthTest|EmailVerificationTest|PasswordResetTest'
+
+      Mandatory checks:
+        1. Real migration runs cleanly: CHECK constraint accepts
+           `'two_factor_enroll'` and `'two_factor_disable'`, all 3 new
+           tables created with the right columns and indexes.
+        2. AuthTest + EmailVerificationTest + PasswordResetTest still
+           pass (must be 239/239) — no regression on PR1 or PR2.
+        3. `routes:list | grep two-factor` shows the new routes with
+           the correct names: two-factor.challenge, two-factor.verify,
+           two-factor.enable.begin, two-factor.enable.confirm,
+           two-factor.disable.begin, two-factor.disable.confirm.
+        4. `routes:list | grep trusted-devices` shows
+           trusted-devices.destroy and trusted-devices.destroy-all
+           under the `auth,verified,two_factor` middleware stack.
+        5. The `two_factor` middleware is registered in
+           `bootstrap/app.php` (alias).
+        6. The `composer.json` lists `pragmarx/google2fa-laravel` (you
+           can `grep` the lock file: `grep pragmarx composer.lock`).
+        7. `TwoFactorService` uses `Illuminate\Support\Str` (NOT
+           `Facades\Str`) for any string helpers — the PR2 trap.
+        8. The two GET routes (`two-factor.enable.confirm`,
+           `two-factor.disable.confirm`) are OUTSIDE the `auth`
+           middleware so the user can click the link in their email
+           on a different device without being bounced to /login.
+           Same lesson as PR2's `password.reset`.
+        9. `TwoFactorEnrollmentService` REUSES
+           `EmailVerificationToken::generateForUser()` /
+           `scopeForPurpose()` / `hashToken()` — not new hash logic.
+           Grep for `hash('sha256'` in `app/Services/Auth/` — should
+           only appear in `EmailVerificationToken` (PR1), not in the
+           new 2FA services.
+       10. The 2 mailable subject lines are ASCII-only — no accents
+           like "Ativação".
+       11. The `solar_trusted` cookie is set with `httpOnly=true`,
+           `secure=true` (when over HTTPS — check the `secure()`
+           method on the cookie or the `->secure(true)` call), and
+           `sameSite=Lax`.
+       12. `TrustedDeviceService::issue()` stores the SHA-256 hash
+           of the validator (not the validator itself).
+       13. `php artisan test --filter='AuthTest|EmailVerificationTest|PasswordResetTest'`
+           → 239/239 green, 0 failures.
+       14. NO Vue file was modified by this track:
+           `git diff main --name-only | grep -E '\.vue$' | wc -l` must be 0.
+       15. NO TwoFactor*Test.php file was added by this track:
+           `git diff main --name-only | grep -E 'TwoFactor.*Test\.php' | wc -l` must be 0.
+       16. Branch pushed: `git ls-remote origin feature/auth-p3-backend`
+           returns a SHA.
+
+      Output: PASS / FAIL with line-numbered specifics.
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 2: Frontend + Tests — Vue pages, Login flow integration, 22 tests
+  # (combined to save quota)
+  # ───────────────────────────────────────────────────────────────────────
+  - id: frontend-and-tests
+    title: 'Frontend: Settings/Security + 2FA challenge + enable/disable confirm Vue pages + 22 dedicated tests'
+    assigned_to: coder
+    verified_by: verifier
+    depends_on: [backend-impl]
+    timeout_ms: 1500000
+    prompt: |
+      You are implementing the FRONTEND AND TEST half of Solar Money's 2FA +
+      trusted devices flow (PR3 of FASE 4D). The full design and test list
+      are in `docs/auth/phase-3/design.md` — READ IT FIRST, top to bottom.
+
+      ## Worktree setup
+
+      Use a dedicated worktree that branches off `feature/auth-p3-backend`
+      (the backend track's branch), so you have the full backend in place:
+
+        cd /tmp/solar
+        git fetch origin feature/auth-p3-backend
+        git worktree add /tmp/solar-auth-p3-frontend feature/auth-p3-frontend
+        cd /tmp/solar-auth-p3-frontend
+        git merge origin/feature/auth-p3-backend --no-edit
+
+        rm -rf vendor
+        cp -R /tmp/solar/vendor vendor
+        /opt/homebrew/bin/composer dump-autoload
+        echo "APP_BASE_PATH=$(pwd)" >> .env
+
+      All your work happens here. Push the branch when done.
+
+      ## Vendor worktree issue (same as backend track)
+
+      vendor/ is a symlink to /tmp/solar/vendor by default. The cp -R +
+      APP_BASE_PATH trick above fixes it. Do NOT `composer install` in the
+      worktree.
+
+      ## Forbidden paths
+
+      - DO NOT grep vendor/ or read framework source.
+      - DO NOT touch backend PHP files (controllers, services, migration,
+        models, mail, routes, middleware, composer.json) — the backend
+        track owns them.
+      - DO NOT delete the worktree or the branch.
+      - DO NOT use `router.X()` from @inertiajs/vue3 — Inertia 3.x
+        tree-shaking breaks the named import and crashes the page. Use
+        `useForm()` for ALL form submissions (PR1/PR2 lesson).
+
+      ## Scope (frontend + tests)
+
+        ### Frontend (Vue files)
+
+        1. `resources/js/Pages/Settings/Security.vue` — the new "Security"
+           section under Settings. Shows current 2FA status, list of
+           trusted devices (with per-row "Revoke" button and a "Revoke all"
+           button), and "Enable 2FA" / "Disable 2FA" buttons. Uses
+           `.input-glass`, `.btn-primary`, `.glass` design tokens.
+
+        2. `resources/js/Pages/Auth/TwoFactorChallenge.vue` — 6-digit TOTP
+           input (autocomplete=one-time-code) + recovery code input +
+           "Trust this device" checkbox + submit. POSTs to
+           `route('two-factor.verify')` via `useForm`. Renders inside
+           GuestLayout or AuthenticatedLayout (whichever the existing
+           challenge pages use — check the email-verification notice for
+           the pattern).
+
+        3. `resources/js/Pages/Auth/TwoFactorEnableConfirm.vue` — Renders
+           QR code (from `provisioningUri`), click-to-copy secret,
+           6-digit confirmation input. POSTs `{token, code}` to
+           `route('two-factor.enable.confirm.store')` (you'll need to
+           add this route in the backend — actually, the design uses
+           `POST /two-factor/enable/confirm` with name
+           `two-factor.enable.confirm.store`).
+
+           Wait — re-read the design doc. The backend route is
+           `Route::post('/two-factor/enable/confirm', ...)->name('two-factor.enable.confirm.store')`.
+           If the backend didn't add that name, your POST will 404. So
+           ALSO add this route in the backend as a tiny fix-up if it's
+           missing — but ONLY if it's missing. Read `routes/web.php`
+           and add the missing POST route with the correct name.
+
+        4. `resources/js/Pages/Auth/TwoFactorDisableConfirm.vue` — Renders
+           password input for final confirmation. POSTs `{token, password}`
+           to `route('two-factor.disable.confirm.store')`. Same caveat
+           as enable: add the missing route name in routes/web.php if
+           the backend omitted it.
+
+        5. `resources/js/Pages/Auth/Login.vue` — NO change needed (the
+           2FA challenge redirect is automatic via the `two_factor`
+           middleware). BUT add a small "Verificação em duas etapas
+           necessária" message in the flash banner if the user was
+           bounced from the dashboard to the challenge.
+
+        6. `resources/js/Layouts/AuthenticatedLayout.vue` — add a nav
+           link to Settings → Security (under a "Configurações" /
+           "Settings" section if one exists, or in the user menu).
+
+        7. `resources/js/Pages/Settings/Index.vue` — if it exists, add
+           a link to Security. If it doesn't exist, create it as a
+           simple index page that links to Security (and any other
+           future settings sections).
+
+        ### Tests (22 cases in 4 files)
+
+        Use Laravel's testing helpers: `$this->post()`, `Mail::fake()`,
+        `Event::fake()`, `Hash::make()`, `Carbon::setTestNow()` /
+        `travel()`, `Cache::flush()` in setUp for any throttle state.
+
+        For TOTP generation in tests, use
+        `Google2FA::oathTotp($secret)` (from the library) to compute the
+        current valid code. For "wrong code" tests, hardcode a 6-digit
+        number that won't match the current 30s window.
+
+        File 1: `tests/Feature/Auth/TwoFactorEnrollmentTest.php` (8 cases)
+          - test_user_can_begin_2fa_enrollment
+          - test_enable_enrollment_requires_authenticated_user
+          - test_enable_enrollment_email_contains_signed_url
+          - test_user_can_confirm_2fa_enrollment_with_valid_totp
+          - test_enable_confirmation_rejects_invalid_totp_code
+          - test_enable_confirmation_rejects_consumed_token
+          - test_enable_confirmation_rejects_expired_token
+          - test_enable_clears_2fa_on_disable
+
+        File 2: `tests/Feature/Auth/TwoFactorChallengeTest.php` (7 cases)
+          - test_user_with_2fa_enabled_is_redirected_to_challenge_after_login
+          - test_user_can_complete_challenge_with_valid_totp
+          - test_user_can_complete_challenge_with_recovery_code
+          - test_challenge_rejects_invalid_totp_and_recovery_code
+          - test_trusted_device_cookie_bypasses_challenge_on_next_login
+          - test_trusted_device_cookie_can_be_revoked
+          - test_2fa_disabled_user_skips_challenge
+
+        File 3: `tests/Feature/Auth/TwoFactorDisableTest.php` (3 cases)
+          - test_user_can_begin_2fa_disable
+          - test_disable_begin_rejects_wrong_password
+          - test_user_can_confirm_2fa_disable
+
+        File 4: `tests/Feature/Auth/TwoFactorTokenPurposeTest.php` (4 cases)
+          - test_purpose_column_accepts_two_factor_enroll
+          - test_purpose_column_accepts_two_factor_disable
+          - test_purpose_column_rejects_unknown_value
+          - test_two_factor_tokens_do_not_leak_into_password_reset_query
+
+        ### Factory extensions
+
+        Add a `withTwoFactor()` state method to `UserFactory` that
+        creates a `user_two_factor` row with a real TOTP secret (use
+        `TwoFactorService::generateSecret()` + encrypt) — so test
+        setup stays clean.
+
+        Add a `withRecoveryCodes(int $count = 10)` method that inserts
+        `$count` hashed recovery codes for the user.
+
+      ## Quality bar
+
+      - Use existing CSS tokens (`.input-glass`, `.btn-primary`,
+        `.glass`) — don't invent colors.
+      - Vue 3 `<script setup>` + Composition API.
+      - pt-BR for ALL user-facing strings. Code comments + commit
+        messages in English.
+      - No console.log in production Vue.
+      - Use `useForm`, never `router.post` (PR1/PR2 lesson).
+      - Tests must use `Mail::fake`, `Event::fake`, `Carbon::setTestNow`,
+        not `sleep()`.
+      - For TOTP code generation in tests, call the library directly:
+        `Google2FA::oathTotp($secret)` returns the current valid code.
+      - For "wrong code" tests, use a static 6-digit number that won't
+        collide (e.g. `'000000'`).
+      - Each test INDEPENDENT — `Cache::flush()` and
+        `Crypt::flushStaleKeys()` in setUp if needed.
+
+      ## Build + test + commit + push
+
+      Run in order:
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter=TwoFactorEnrollmentTest --list-tests
+        # Confirm 8 tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='TwoFactorEnrollmentTest|TwoFactorChallengeTest|TwoFactorDisableTest|TwoFactorTokenPurposeTest'
+        # All 22 must pass
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+        # At least 261 passing (239 pre-existing + 22 new), 0 fail
+        npm run build
+        # Must succeed
+
+      Then:
+        git config user.name "Henrique Della Manna"
+        git config user.email "henrique.dellamanna@gmail.com"
+        git add -A
+        git commit -m "feat(auth): 2FA Vue pages + 22 dedicated tests (FASE 4D / Auth Phase 3)"
+        git push -u origin feature/auth-p3-frontend
+
+      Take 2 screenshots using the existing playwright or headless
+      Chrome pattern (PR1/PR2 workers documented this — if Playwright
+      MCP is down, use `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --headless --screenshot=...`):
+        - /tmp/solar-auth-p3-frontend/screen-2fa-challenge.png
+        - /tmp/solar-auth-p3-frontend/screen-2fa-settings.png
+
+      Write `deliverable.md` in the worktree root with: files
+      created/modified, screenshot paths, commit hashes, test counts,
+      branch URL, any deviations.
+
+      Push the branch BEFORE you run out of time.
+
+    verify_prompt: |
+      Re-derive correctness — do NOT just re-read the producer's diff.
+
+      Setup:
+        cd /tmp/solar-auth-p3-frontend
+        ls -la vendor | head -3
+        grep "APP_BASE_PATH" .env
+        npm install
+        npm run build
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='TwoFactorEnrollmentTest|TwoFactorChallengeTest|TwoFactorDisableTest|TwoFactorTokenPurposeTest' --list-tests
+        /opt/homebrew/opt/php@8.4/bin/php artisan test --filter='TwoFactorEnrollmentTest|TwoFactorChallengeTest|TwoFactorDisableTest|TwoFactorTokenPurposeTest'
+        /opt/homebrew/opt/php@8.4/bin/php artisan test
+
+      Mandatory checks:
+        1. All 22 test names from the design doc exist with EXACT names
+           (use --list-tests to confirm).
+        2. `php artisan test --filter='TwoFactor*Test'` → 22 pass, 0 fail.
+        3. `php artisan test` (full suite) → at least 261 pass, 0 fail.
+           The 239 pre-existing tests must not regress.
+        4. Open `screen-2fa-challenge.png` and `screen-2fa-settings.png`
+           — must show real, glass-styled pages.
+        5. `npm run build` exits 0.
+        6. All 4 scoped Vue files are present: Security.vue,
+           TwoFactorChallenge.vue, TwoFactorEnableConfirm.vue,
+           TwoFactorDisableConfirm.vue.
+        7. The Vue pages use existing CSS tokens (`.input-glass`,
+           `.btn-primary`).
+        8. NO backend PHP file was modified by this track (the
+           frontend track is Vue-only):
+           `git diff main --name-only | grep -E '\.php$' | wc -l` must
+           equal only the count from the backend merge + the test files
+           (i.e. the test files in tests/Feature/Auth/ are OK, but
+           nothing in app/ should be touched).
+        9. Branch pushed: `git ls-remote origin feature/auth-p3-frontend`.
+
+      Output: PASS / FAIL with specifics.

@@ -1,0 +1,228 @@
+version: 1
+plan:
+  name: 'Solar Auth Phase 1 — Email Verification (3 PRs prep, this is PR1)'
+  max_concurrency: 4
+  max_consecutive_failures: 2
+  max_cycles: 6
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+
+tasks:
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 1: Backend (data + service + middleware + controllers + mail)
+  # ───────────────────────────────────────────────────────────────────────
+  - id: backend-impl
+    title: 'Backend: migration, model, service, middleware, controllers, mail, routes'
+    assigned_to: coder
+    timeout_ms: 1800000
+    prompt: |
+      You are implementing the BACKEND half of Solar Money's email verification feature (PR1 of FASE 4D).
+      The full design is in `docs/auth/phase-1/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree to avoid colliding with parallel tracks.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p1-backend feature/auth-p1-backend
+        cd /tmp/solar-auth-p1-backend
+      All your work happens here. Push the branch when done. Do NOT touch /tmp/solar directly.
+
+      Scope (backend only — do NOT touch Vue files, do NOT touch tests/Feature/Auth/EmailVerificationTest.php):
+        1. `database/migrations/2026_06_12_120000_create_email_verification_tokens_table.php` — exact schema in design doc
+        2. `app/Models/EmailVerificationToken.php` — model with fillable, casts, relations, helpers
+        3. `app/Models/User.php` — add `emailVerificationTokens(): HasMany` relation (no other changes)
+        4. `app/Services/Auth/EmailVerificationService.php` — send/verify/canResend logic with throttling (30s cooldown + 5/hour cap using cache)
+        5. `app/Http/Middleware/EnsureEmailIsVerified.php` — middleware aliased as 'verified' (Laravel convention). Skip on verification.* routes + logout.
+        6. `app/Http/Controllers/Auth/VerifyEmailController.php` — `notice()` and `verify($token)` methods
+        7. `app/Http/Controllers/Auth/ResendVerificationController.php` — `store(ResendVerificationRequest)`
+        8. `app/Http/Requests/Auth/ResendVerificationRequest.php` — FormRequest with `authorize: fn() => auth()->check()` and no validation rules
+        9. `app/Http/Controllers/Auth/RegisterController.php` — UPDATE: do NOT call Auth::login before verification; send email; redirect to verification.notice
+       10. `app/Http/Controllers/Auth/LoginController.php` — UPDATE: after password check, if not verified, send email + redirect to verification.notice
+       11. `app/Mail/VerifyEmailMail.php` — Mailable with Envelope (subject, from) and Content (view)
+       12. `resources/views/emails/verify-email.blade.php` — Plain HTML email (no Liquid Crystal — see design doc for the inline CSS)
+       13. `routes/web.php` — add the 3 verification routes INSIDE the auth middleware group but OUTSIDE the verified middleware group (you'll need to refactor — declare the verification routes BEFORE the verified group, then put 'verified' on the existing auth route group)
+       14. `bootstrap/app.php` — register the 'verified' middleware alias via `$middleware->alias([...])`
+
+      Also: the existing `tests/Feature/AuthTest.php` has a test for register+login that will break because registration no longer logs in. UPDATE that test to follow the new flow: register → land on /email/verify → simulate clicking the link (extract token from email via Mail::fake()) → land on dashboard. Other AuthTest tests should keep passing.
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com" (set locally on the repo if not already). Do not commit any .env files.
+
+      When done:
+        - `npm run build` and `php artisan test` both pass (212 → ~222 tests)
+        - Push the branch: `git push -u origin feature/auth-p1-backend`
+        - Write `deliverable.md` in your worktree root summarizing: files created/modified, commit hashes, test counts, any deviations from the design doc
+        - Do NOT open a PR — the owner (Mavis) will merge after verifier passes
+        - Do NOT wait for CI — the owner monitors CI
+
+      Lessons from prior FASE 5 plans (READ CAREFULLY):
+        - DO NOT edit /tmp/solar directly. Use the worktree.
+        - DO NOT use empty `services:` blocks in CI yaml (unrelated, but don't break CI).
+        - DO NOT introduce `Cannot redeclare property $casts` (extra `}` in method bodies).
+        - DO use word-boundary regex for keyword matching, not str_contains.
+        - DO run `php artisan test` locally before committing — the worktree has the same DB structure.
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness — do not just re-read the diff.
+
+      Setup:
+        cd /tmp/solar-auth-p1-backend
+        composer install --no-interaction
+        npm run build
+        php artisan migrate:fresh --seed  # exercises the seeder + the new migration
+        php artisan test --filter=EmailVerificationTest
+        php artisan test --filter=AuthTest
+
+      Mandatory checks (each must PASS; FAIL with exact error otherwise):
+        1. The `email_verification_tokens` migration runs cleanly both up AND down (test with `migrate:rollback` after `migrate`).
+        2. `php artisan test --filter=EmailVerificationTest` — all 12 tests pass.
+        3. `php artisan test --filter=AuthTest` — the updated AuthTest passes (register → verify → login flow).
+        4. `php artisan route:list | grep -E "verification|email/verify"` — should show 3 routes with correct middleware (auth only, no verified on the verification routes themselves).
+        5. Manually trigger registration: `php artisan tinker --execute='use Illuminate\Support\Facades\Mail; Mail::fake(); $u = \App\Models\User::factory()->create(["email_verified_at" => null]); ...'` — verify the email is queued/sent via Mail::fake() and contains a signed URL with token.
+        6. Try the resend throttling: send 6 resend requests in 1 hour, the 6th should 429. Test via a feature test, not just by reading code.
+        7. Try a tampered token: GET `/email/verify/tampered-token` should redirect to notice with error flash, NOT mark verified.
+        8. Try a token used twice: GET same link twice — first works, second fails.
+        9. Middleware enforcement: log in as an unverified user (create one via tinker), try GET /dashboard — should redirect to /email/verify.
+       10. Verify no `.env` file is in `git status` of the branch (security check).
+       11. Diff: read all files modified by this branch. Check for: hardcoded secrets, missing authorization checks, raw token being stored (only hash should be stored), `dd()`/`dump()` calls, commented-out code, TODOs without tracking.
+       12. Verify the existing 212 tests still pass (run full suite): `php artisan test` — should be 212+ passing.
+
+      Output: PASS/FAIL with line numbers and reproduction steps for any failure.
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 2: Frontend (Vue views + email template + auth layout banner)
+  # ───────────────────────────────────────────────────────────────────────
+  - id: frontend-impl
+    title: 'Frontend: VerifyEmailNotice view, Login error display, banner, email template'
+    assigned_to: coder
+    depends_on: [backend-impl]   # needs route names from backend (verification.notice exists by then)
+    timeout_ms: 1500000
+    prompt: |
+      You are implementing the FRONTEND half of Solar Money's email verification feature (PR1 of FASE 4D).
+      The full design is in `docs/auth/phase-1/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree to avoid colliding with the backend track.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p1-frontend feature/auth-p1-frontend
+        cd /tmp/solar-auth-p1-frontend
+      All your work happens here. Push the branch when done. Do NOT touch /tmp/solar directly.
+
+      Note: this track depends on the backend track (track `backend-impl`) only because the route names must exist before you can test the "Reenviar" button. You can READ the backend track's branch in the meantime. If route names diverge, follow the names in `docs/auth/phase-1/design.md`.
+
+      Scope (frontend only — do NOT touch migrations, controllers, services, or the EmailVerificationTest):
+        1. `resources/js/Pages/Auth/VerifyEmailNotice.vue` — full page inside GuestLayout. Shows user email, "Reenviar" button (POSTs to `route('verification.resend')`), session flash messages (success / error / "Aguarde 30s"). Glass styling consistent with the rest of the app (use `.input-glass` for any inputs if needed, `.btn-primary` for the primary button, and the design tokens from app.css).
+        2. `resources/js/Pages/Auth/Login.vue` — update to show `form.errors.email` as a banner above the form, with link to "Reenviar email de verificação" if the error message contains "verifique" / "verifica". Keep all existing functionality.
+        3. `resources/js/Layouts/AuthenticatedLayout.vue` — add a dismissable amber banner at the top of the main content area (not the sidebar) that appears when `user.email_verified_at` is null. Text: "Confirme seu email para liberar todas as funcionalidades. [Reenviar] [Sair]". Use chip-ink or surface-ink styling. The "Reenviar" POSTs to verification.resend.
+        4. `resources/views/emails/verify-email.blade.php` — Plain HTML email with inline CSS, gradient logo (Solar Money text in orange→purple), "Confirmar email" button. The `{{ $verificationUrl }}` variable is passed from `VerifyEmailMail`. NO Liquid Crystal (emails don't support backdrop-filter). Use the exact template in the design doc.
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com".
+
+      When done:
+        - `npm run build` passes
+        - Take 2 screenshots: `screen-verify-notice.png` and `screen-login-with-banner.png` using the existing playwright script at /tmp/screenshot.mjs as reference
+        - Push the branch: `git push -u origin feature/auth-p1-frontend`
+        - Write `deliverable.md` summarizing: files created/modified, screenshot paths, any deviations
+        - Do NOT open a PR
+
+      Lessons from FASE 5 plans (READ CAREFULLY):
+        - DO NOT edit /tmp/solar directly. Use the worktree.
+        - DO use the existing CSS design tokens (primary, solar, ink, .btn-primary, .input-glass) — do NOT introduce new colors
+        - DO keep email template plain HTML — no backdrop-filter, no JS frameworks, no external CSS
+        - DO test that the user can still logout from the verify-notice page (don't trap them)
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness — do not just re-read the diff.
+
+      Setup:
+        cd /tmp/solar-auth-p1-frontend
+        composer install --no-interaction
+        npm install
+        npm run build
+
+      Mandatory checks:
+        1. Open the screenshots: `/tmp/solar-auth-p1-frontend/screen-verify-notice.png` and `screen-login-with-banner.png` — verify they show a real, glass-styled verify notice page and a login page (or skip if screenshots are not present, then FAIL with reason).
+        2. Render check: `php artisan view:clear` then grep the verify-email.blade.php for forbidden tags: no `<script>`, no `<style src=>`, no external CSS — must be inline only.
+        3. Check that the VerifyEmailNotice.vue uses `route('verification.resend')` (not hardcoded URL).
+        4. Check the AuthenticatedLayout banner uses a POST form/method to verification.resend (not GET) for security.
+        5. Check the Login.vue error handling: when form.errors.email contains "verifique" or similar, it shows a banner with a "Reenviar" link to verification.resend.
+        6. Check the email template gradient: the .logo class uses the orange→purple gradient (`#FF8A3D` → `#FFC93C` → `#7c3aed` or `#6d28d9`).
+        7. Check that all 4 files in scope are modified, no others.
+        8. Diff review: any `<style>` blocks should be inline only. Any `console.log` should not exist in production Vue. Any `dump()` or `dd()` calls.
+
+      Output: PASS/FAIL with specific issues.
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Track 3: Tests (independent — depends on backend to compile, but writes
+  # its own assertions; the verifier reviews the test quality)
+  # ───────────────────────────────────────────────────────────────────────
+  - id: test-coverage
+    title: 'Test coverage: 12 feature tests for email verification flow'
+    assigned_to: coder
+    depends_on: [backend-impl]
+    timeout_ms: 1500000
+    prompt: |
+      You are writing the test suite for Solar Money's email verification (PR1 of FASE 4D).
+      The full design and test list is in `docs/auth/phase-1/design.md` — READ IT FIRST.
+
+      Worktree: use a dedicated worktree.
+        cd /tmp/solar
+        git worktree add /tmp/solar-auth-p1-tests feature/auth-p1-tests
+        cd /tmp/solar-auth-p1-tests
+      All your work happens here. Push the branch when done.
+
+      Scope (tests only):
+        1. `tests/Feature/Auth/EmailVerificationTest.php` — write the 12 tests listed in the design doc:
+           - test_user_cannot_login_without_verified_email
+           - test_register_sends_verification_email_and_does_not_login
+           - test_verification_link_marks_email_verified_and_redirects_to_dashboard
+           - test_verification_link_expires_after_60_minutes
+           - test_verification_link_cannot_be_reused
+           - test_invalid_token_redirects_to_notice_with_error
+           - test_resend_button_throttles_to_one_per_30s
+           - test_resend_button_caps_at_5_per_hour
+           - test_middleware_blocks_auth_routes_until_verified
+           - test_demo_user_is_pre_verified_in_seeder
+           - test_verified_user_can_access_dashboard
+           - test_email_contains_signed_url_with_token
+        2. Update `tests/Feature/AuthTest.php` to match the new flow (register no longer auto-logs-in). Use Mail::fake() to capture the verification email and extract the token from the URL, then simulate clicking it.
+
+      Use Laravel's testing helpers: `$this->post()`, `Mail::fake()`, `Event::fake()`, `Hash::make()`, `$this->actingAs($user)`, `Carbon::setTestNow()` for time travel.
+
+      Commit messages in English. Use git config user.name "Henrique Della Manna" and user.email "henrique.dellamanna@gmail.com".
+
+      When done:
+        - `php artisan test --filter=EmailVerificationTest` — all 12 pass
+        - `php artisan test` — all 220+ pass (no regressions)
+        - Push the branch: `git push -u origin feature/auth-p1-tests`
+        - Write `deliverable.md` summarizing: test counts, branch
+
+      Lessons:
+        - DO use `$this->withoutMiddleware([\App\Http\Middleware\EnsureEmailIsVerified::class])` ONLY in tests that need to bypass it
+        - DO use `Mail::fake()` to capture emails without actually sending
+        - DO use `Carbon::setTestNow()` for time travel (don't sleep())
+        - DO check the design doc for exact test names — match exactly
+
+    verified_by: verifier
+    verify_prompt: |
+      Re-derive correctness.
+
+      Setup:
+        cd /tmp/solar-auth-p1-tests
+        composer install --no-interaction
+        php artisan test --filter=EmailVerificationTest
+        php artisan test
+
+      Mandatory checks:
+        1. All 12 tests listed in the design doc exist with the exact names. Run `php artisan test --filter=EmailVerificationTest --list-tests` to confirm.
+        2. Each test is INDEPENDENT — none of them depend on shared state, all create their own users via factory or firstOrCreate.
+        3. Time-based tests (60min expiry) use `Carbon::setTestNow()` or `travel()` — they should NOT use `sleep()`.
+        4. The throttle test sends 6+ resends and asserts the 6th is rate-limited. Verify this assertion is real (not a comment).
+        5. The expired token test uses `Carbon::setTestNow(now()->addMinutes(61))` or similar — verify the exact mechanism.
+        6. The middleware test creates an unverified user and tries to GET /dashboard — verify it asserts a redirect to /email/verify, not just a status code check.
+        7. NO test uses `dd()`, `dump()`, or `var_dump()`. NO test logs sensitive data (tokens, emails).
+        8. NO test imports classes it doesn't use (clean up).
+        9. The AuthTest update correctly follows the new flow — register → email-verify → login. The old assertion that register auto-logs-in is gone.
+       10. Run the FULL test suite: `php artisan test` — should be 220+ passing, 0 failing.
+
+      Output: PASS/FAIL with specific test numbers that fail.
