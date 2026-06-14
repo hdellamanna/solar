@@ -62,12 +62,23 @@ class AppServiceProvider extends ServiceProvider
      * controller (TOTP and recovery-code counters) so the
      * recovery path can be tighter than the TOTP path even
      * though both hit the same URL.
+     *
+     * Note on key lookup: two of the config keys (`two-factor.challenge`
+     * and `two-factor.recovery`) contain a dot, which the
+     * `config()` helper interprets as a nested path separator.
+     * Reading with `config("rate-limits.two-factor.recovery.per_min")`
+     * returns NULL because Laravel looks for the literal
+     * `two-factor` > `recovery` > `per_min` chain under
+     * `rate-limits` — but the config file stores them as a
+     * SINGLE key with a dotted name. We use array access with
+     * the literal key to keep the dotted name intact.
      */
     private function registerAuthRateLimiters(): void
     {
         $register = function (string $name, string $configKey): void {
             RateLimiter::for($name, function (Request $request) use ($configKey): Limit {
-                $perMinute = (int) config("rate-limits.{$configKey}.per_min", 10);
+                $config = config('rate-limits');
+                $perMinute = (int) ($config[$configKey]['per_min'] ?? 10);
 
                 return Limit::perMinute($perMinute)->by($request->ip());
             });
