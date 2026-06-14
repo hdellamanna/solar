@@ -1,5 +1,22 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full">
+@php
+    // FASE 4D — emit motion data-attributes server-side so the very
+    // first paint has the correct reduced/full state with no FOUC.
+    // The Inertia shared `motion` prop carries the resolved preference.
+    // We use the UserMotionPreference service so the 3 granular flags
+    // respect the resolved preference (e.g. when pref=reduced, all
+    // 3 flags resolve to 0 regardless of user.motion_backdrop=1).
+    $motionProps = app(\App\Services\UserMotionPreference::class)->toInertiaProps(request());
+    $motionPref = $motionProps['preference'] ?? 'auto';
+    $motionBackdrop = ($motionProps['backdrop'] ?? true) ? '1' : '0';
+    $motionSpring = ($motionProps['spring'] ?? true) ? '1' : '0';
+    $motionParallax = ($motionProps['parallax'] ?? true) ? '1' : '0';
+@endphp
+<html lang="pt-BR" class="h-full"
+      data-motion="{{ $motionPref }}"
+      data-motion-backdrop="{{ $motionBackdrop }}"
+      data-motion-spring="{{ $motionSpring }}"
+      data-motion-parallax="{{ $motionParallax }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

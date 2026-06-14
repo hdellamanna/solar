@@ -27,9 +27,11 @@ class AppearanceController extends Controller
     /**
      * Render the Appearance settings page.
      */
-    public function __invoke(): \Inertia\Response
+    public function __invoke(Request $request): \Inertia\Response
     {
-        return inertia('Settings/Appearance');
+        return inertia('Settings/Appearance', [
+            'user' => $request->user(),
+        ]);
     }
 
     /**
@@ -37,7 +39,7 @@ class AppearanceController extends Controller
      */
     public function show(): \Inertia\Response
     {
-        return $this->__invoke();
+        return $this->__invoke(request());
     }
 
     /**

@@ -1,4 +1,6 @@
 <script setup>
+import AppFooter from '@/Components/AppFooter.vue';
+
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
@@ -127,5 +129,6 @@ defineProps({
                 <slot />
             </div>
         </main>
+        <AppFooter />
     </div>
 </template>

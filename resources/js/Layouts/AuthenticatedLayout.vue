@@ -5,6 +5,7 @@ import { useTheme } from '@/Composables/useTheme';
 import { useShortcuts } from '@/Composables/useShortcuts';
 import { useGlobalSearch } from '@/Composables/useGlobalSearch';
 import { initials, formatCents, formatDate } from '@/Composables/useFormat';
+import AppFooter from '@/Components/AppFooter.vue';
 
 const props = defineProps({
     title: { type: String, default: '' },
@@ -554,5 +555,6 @@ const totalResults = () => {
                 </div>
             </nav>
         </div>
+        <AppFooter />
     </div>
 </template>

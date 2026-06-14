@@ -27,6 +27,24 @@ const settingsSections = [
         icon: 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zm13 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
         accent: 'from-solar-500 to-solar-600',
     },
+    {
+        key: 'appearance',
+        href: 'settings.appearance.show',
+        name: 'Aparencia',
+        description: 'Animacoes, intensidade do glass e parallax. Respeita a preferencia do sistema.',
+        icon: 'M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3',
+        accent: 'from-amber-500 to-amber-700',
+    },
+    {
+        key: 'ai',
+        href: 'settings.appearance.show',
+        name: 'Inteligencia artificial',
+        description: 'Assistente IA em todas as paginas (em breve - FASE 8).',
+        icon: 'M12 2a3 3 0 00-3 3v1H7a3 3 0 00-3 3v8a3 3 0 003 3h2v2l3-2h5a3 3 0 003-3V9a3 3 0 00-3-3h-2V5a3 3 0 00-3-3z',
+        accent: 'from-purple-500 to-fuchsia-600',
+        disabled: true,
+        badge: 'Em breve',
+    },
 ];
 </script>
 
@@ -43,11 +61,11 @@ const settingsSections = [
 
             <ul class="space-y-3">
                 <li v-for="section in settingsSections" :key="section.key">
-                    <Link
-                        :href="route(section.href)"
-                        class="card p-5 flex items-center gap-4 hover:shadow-soft
-                               hover:border-primary-200/70 dark:hover:border-primary-500/30
-                               transition-all duration-200 group"
+                    <component
+                        :is="section.disabled ? 'div' : Link"
+                        :href="section.disabled ? null : route(section.href)"
+                        :class="['card p-5 flex items-center gap-4 transition-all duration-200 group',
+                                 section.disabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-soft hover:border-primary-200/70 dark:hover:border-primary-500/30']"
                     >
                         <div
                             class="w-11 h-11 rounded-xl grid place-items-center shrink-0
@@ -68,9 +86,17 @@ const settingsSections = [
                         <svg class="w-4 h-4 text-ink-400 group-hover:text-primary-500
                                     group-hover:translate-x-0.5 transition-all"
                              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  :d="section.disabled ? 'M12 8v4M12 16h.01M12 2a10 10 0 100 20 10 10 0 000-20z' : 'M9 5l7 7-7 7'" />
                         </svg>
-                    </Link>
+                        <span v-if="section.badge"
+                              class="ml-1 px-2 py-0.5 text-[10px] rounded-full
+                                     bg-amber-100 text-amber-700
+                                     dark:bg-amber-500/15 dark:text-amber-300
+                                     font-semibold uppercase tracking-wide">
+                            {{ section.badge }}
+                        </span>
+                    </component>
                 </li>
             </ul>
         </div>

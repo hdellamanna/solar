@@ -668,3 +668,32 @@
     }
     .glass-sweep::after { display: none; }
 }
+
+/* FASE 4D — Motion preferences data-attribute variants.
+   The `motion` value comes from the Inertia shared prop and is
+   written to <html> by the app entrypoint. Default is "auto" which
+   respects the OS-level prefers-reduced-motion. "reduced" forces it.
+   "full" disables the OS-level kill switch. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+html[data-motion="full"] *,
+html[data-motion="full"] *::before,
+html[data-motion="full"] *::after {
+    /* No-op — preserves default motion. The flag exists so other
+       components can key off it (e.g. the AiAgentSlot's spring bubble
+       reads this attribute). */
+}
+html[data-motion-backdrop="0"] .mesh-canvas,
+html[data-motion-backdrop="0"] .glass-sweep {
+    display: none !important;
+}
+html[data-motion-parallax="0"] .sun-parallax,
+html[data-motion-parallax="0"] [data-parallax] {
+    transform: none !important;
+}
