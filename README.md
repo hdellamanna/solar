@@ -8,6 +8,8 @@
 
 Phases **1**, **2**, **3**, **4A / 4B / 4C / 4D (auth phases 1-3)**, **5**, **6A** and the **FASE Polish** v0.10.0 milestone (observability + resilience + refactor) are complete and merged. Phases 6B, 7, 8, 9, 10 are pending.
 
+Users can now tune motion effects (**Settings > Appearance**) with a system-aware default and per-category overrides (backdrop canvas, spring transitions, sun parallax) — all persisted per account and honouring the OS `prefers-reduced-motion` preference.
+
 ### FASE 1 — Foundation ✅
 - 🔐 **Full auth** — registration, login, logout, middleware
 - 🏠 **Dashboard** with 4 KPI cards (total balance, monthly inflow / outflow / savings), accounts list, recent transactions

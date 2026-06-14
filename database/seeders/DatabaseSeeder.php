@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Account;
 use App\Models\AccountBalance;
+use App\Models\AppMeta;
 use App\Models\Category;
 use App\Models\Debt;
 use App\Models\Goal;
@@ -27,6 +28,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        // FASE 4D — build metadata (version, env)
+        $this->call(AppMetaSeeder::class);
+
         $user = User::firstOrCreate(
             ['email' => 'demo@solar.app'],
             [
