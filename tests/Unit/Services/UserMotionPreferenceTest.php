@@ -177,11 +177,11 @@ class UserMotionPreferenceTest extends TestCase
         $this->assertFalse($props['parallax']);  // user disabled
     }
 
-    public function test_to_inertia_props_returns_all_false_when_os_prefers_reduced(): void
+    public function test_to_inertia_props_returns_all_false_when_os_prefers_reduced_and_user_on_auto(): void
     {
         $user = User::factory()->make([
-            'motion_preference' => 'full',
-            'motion_backdrop'   => true,  // would be on if not for OS
+            'motion_preference' => 'auto',   // user on auto — OS wins
+            'motion_backdrop'   => true,
             'motion_spring'     => true,
             'motion_parallax'   => true,
         ]);
@@ -190,9 +190,32 @@ class UserMotionPreferenceTest extends TestCase
         $prefs = new UserMotionPreference($user);
         $props = $prefs->toInertiaProps($req);
 
-        // OS reduced motion always wins — the 'preference' field reflects
-        // the effective state so the frontend UI stays in sync.
+        // User on 'auto' + OS prefers reduced → effective state is 'reduced'
+        // and all 3 granular flags resolve to false.
         $this->assertSame('reduced', $props['preference']);
+        $this->assertFalse($props['backdrop']);
+        $this->assertFalse($props['spring']);
+        $this->assertFalse($props['parallax']);
+    }
+
+    public function test_to_inertia_props_keeps_full_preference_but_zeroes_granular_flags_when_user_chose_full(): void
+    {
+        // The user explicitly chose 'full' — this overrides the OS
+        // preference (per the FASE 4D contract: "full" ignores OS).
+        // However, the user's granular flags (which they all set to
+        // false) still apply individually.
+        $user = User::factory()->make([
+            'motion_preference' => 'full',
+            'motion_backdrop'   => false,
+            'motion_spring'     => false,
+            'motion_parallax'   => false,
+        ]);
+
+        $req = Request::create('/settings/appearance?' . http_build_query(['__test_reduced_motion' => '1']));
+        $prefs = new UserMotionPreference($user);
+        $props = $prefs->toInertiaProps($req);
+
+        $this->assertSame('full', $props['preference']);
         $this->assertFalse($props['backdrop']);
         $this->assertFalse($props['spring']);
         $this->assertFalse($props['parallax']);

@@ -20,6 +20,8 @@ class AppMeta extends Model
 
     protected $keyType = 'string';
 
+    protected $fillable = ['key', 'value'];
+
     /**
      * Read a value by key, returning $default if the key does not exist.
      */

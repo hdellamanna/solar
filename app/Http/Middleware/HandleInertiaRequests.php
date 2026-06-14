@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\AppMeta;
 use App\Services\UserMotionPreference;
 use Closure;
 use Illuminate\Http\Request;
@@ -70,6 +71,16 @@ class HandleInertiaRequests extends Middleware
             // so the first paint has the correct data attributes
             // with no FOUC.
             'motion' => $motionPrefs->toInertiaProps($request),
+            // FASE 4D — build metadata + feature flags surfaced
+            // to the front-end. The footer reads build_version
+            // and locale; the AI agent slot reads features.ai_agent.
+            'appMeta' => [
+                'build_version' => AppMeta::get('build_version', '0.11.0'),
+                'locale' => AppMeta::get('locale', 'pt-BR'),
+                'features' => [
+                    'ai_agent' => (bool) config('features.ai_agent', false),
+                ],
+            ],
         ];
     }
 

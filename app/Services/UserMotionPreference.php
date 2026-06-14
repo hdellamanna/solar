@@ -106,9 +106,14 @@ class UserMotionPreference
         $userPref = $this->user?->motion_preference ?? 'auto';
         $osReduced = $this->osPrefersReduced($request);
 
-        // OS reduced motion always wins — surface 'reduced' so the frontend
-        // knows the effective state even if the user explicitly chose 'full'.
-        if ($osReduced && $userPref !== 'reduced') {
+        // The "reduced" state is the union of two signals:
+        //   1. User explicitly chose 'reduced', OR
+        //   2. User is on 'auto' AND OS prefers-reduced-motion.
+        // Either way, all 3 granular flags resolve to false.
+        $isReduced = $userPref === 'reduced'
+            || ($userPref === 'auto' && $osReduced);
+
+        if ($isReduced) {
             return [
                 'preference' => 'reduced',
                 'backdrop'   => false,
@@ -117,7 +122,8 @@ class UserMotionPreference
             ];
         }
 
-        // User explicitly chose reduced or OS is not reduced.
+        // User explicitly chose 'full' or 'auto' + OS doesn't prefer reduced.
+        // The 3 granular flags apply as-is.
         return [
             'preference' => $userPref,
             'backdrop'   => (bool) ($this->user?->motion_backdrop ?? true),

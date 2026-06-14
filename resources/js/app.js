@@ -24,12 +24,39 @@ createInertiaApp({
         return pages[`./Pages/${name}.vue`];
     },
     setup({ el, App, props, plugin }) {
-        return createApp({ render: () => h(App, props) })
+        const initial = props.initialPage;
+        // FASE 4D — set the <html> data-motion attributes from the
+        // server-resolved motion preference on the very first paint,
+        // so there's no FOUC. The composable re-syncs on subsequent
+        // navigations.
+        try {
+            if (typeof document !== 'undefined' && initial?.props?.motion) {
+                const m = initial.props.motion;
+                document.documentElement.setAttribute('data-motion', m.preference ?? 'auto');
+                document.documentElement.setAttribute('data-motion-backdrop', m.backdrop === false ? '0' : '1');
+                document.documentElement.setAttribute('data-motion-spring', m.spring === false ? '0' : '1');
+                document.documentElement.setAttribute('data-motion-parallax', m.parallax === false ? '0' : '1');
+            }
+        } catch (e) { /* SSR safety */ }
+
+        const app = createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(createPinia())
             .use(ZiggyVue)
-            .component('Apexchart', VueApexCharts)
-            .mount(el);
+            .component('Apexchart', VueApexCharts);
+
+        // FASE 4D — mount the AI agent slot (FASE 8 chrome placeholder)
+        // at the document level so it floats across every page.
+        if (typeof document !== 'undefined') {
+            const slotEl = document.createElement('div');
+            slotEl.id = 'ai-agent-slot-root';
+            document.body.appendChild(slotEl);
+            import('./Components/AiAgentSlot.vue').then(({ default: AiAgentSlot }) => {
+                createApp({ render: () => h(AiAgentSlot) }).mount(slotEl);
+            });
+        }
+
+        return app.mount(el);
     },
     progress: {
         color: '#f59e0b',
