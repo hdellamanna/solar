@@ -4,9 +4,9 @@
 
 **Solar** is a modernized clone of **Microsoft Money Sunset (2008)**, built on **Laravel 13 + Vue 3 + Inertia 3** with a contemporary Brazilian fintech UX (Nubank / Inter / Will as references).
 
-## ✨ Current status — FASE 5 delivered
+## ✨ Current status — v0.10.0 (FASE Polish) delivered
 
-Phases **1**, **2**, **3**, **4A / 4B / 4C**, **6A** and **5** are complete and merged. Phases 6B, 7, 8, 9, 10 are pending.
+Phases **1**, **2**, **3**, **4A / 4B / 4C / 4D (auth phases 1-3)**, **5**, **6A** and the **FASE Polish** v0.10.0 milestone (observability + resilience + refactor) are complete and merged. Phases 6B, 7, 8, 9, 10 are pending.
 
 ### FASE 1 — Foundation ✅
 - 🔐 **Full auth** — registration, login, logout, middleware
@@ -100,8 +100,8 @@ php artisan test
 Current result:
 
 ```
-Tests:  212 passed (1918 assertions)
-Duration: 1.7s
+Tests:  261 passed (2248 assertions)
+Duration: 2.4s
 ```
 
 Coverage by feature:
@@ -125,6 +125,10 @@ Coverage by feature:
 - **AmortizationService (FASE 5)** — SAC constant principal, Price constant payment, zero-interest, insufficient payment flag, float drift, 600-month cap
 - **PWA (FASE 5)** — manifest fields, icons HTTP 200, SW content type, versioned cache, network-only API, SKIP_WAITING message, PWA meta tags
 - **Multi-currency (FASE 6A)** — sub-balances CRUD, isolation, FxRateService cache + dates + failure modes
+- **Email verification (Auth Phase 1)** — 12 cases: resend throttle (30s / 5-hour), consume stamps `email_verified_at`, expired / consumed / unknown rejection, signed URL contract, raw token never persisted
+- **Password reset (Auth Phase 2)** — 13 cases: 30s / 5-hour throttle keyed by email hash, no-enumeration (unknown email returns same flash), 60-min TTL, single-use, sibling token invalidation on success, auto-login, regression with PR1
+- **2FA enrollment / disable (Auth Phase 3)** — 22 cases: TOTP verification, recovery-code mint + consume, trusted-device cookie, signed GET vs unsigned POST distinction, defense-in-depth password re-prompt on disable, purpose discriminator isolation
+- **BearerTokenService (FASE Polish)** — single source of truth for the token lifecycle; the three per-purpose services are thin adapters that preserve the public surface 1-for-1
 
 ## 🏗️ Stack
 
@@ -336,7 +340,7 @@ erDiagram
 | 7     | ⏳ todo | [Tri-lingual i18n](#fase-7--i18n-tri-língue)                                              |
 | 8     | ⏳ todo | [AI financial advisor](#fase-8--ai-insights)                                              |
 | 9     | ⏳ todo | [Crypto tracker](#fase-9--crypto)                                                         |
-| 10    | ⏳ todo | [Polish + E2E + Tauri installer](#fase-10--polish--e2e--tauri-installer)                  |
+| 10    | 🔄 in progress | Polish (✅ done in v0.10.0) + E2E tests + Tauri installer |
 
 ### FASE 5 — Investments + Debts + AI categorize + PWA ✅
 
@@ -397,7 +401,82 @@ The final stretch before the project is genuinely shippable.
 - **CI** — GitHub Actions pipeline: lint (php-cs-fixer / eslint), static analysis (phpstan / vue-tsc), unit + feature tests on PR, build verification, deploy on `main` if green.
 - **Tauri installer** — wrap the Laravel + Vue + SQLite bundle in a Tauri shell, producing signed `.dmg` (macOS), `.msi` (Windows), and `.AppImage` (Linux). The user double-clicks and the app opens its own window with the full backend running locally — no PHP install, no Node install, no terminal. Auto-update via `tauri-updater`.
 
-## 🤝 Contributing
+## 🛰️ Observability & resilience (FASE Polish / v0.10.0)
+
+The FASE Polish milestone adds the production-readiness infrastructure that every Solar deployment will need the day it sees real traffic. Three orthogonal systems, shipped together:
+
+### Structured JSON logging
+
+Every log record written through the `structured` Monolog channel is a single JSON line — ready for ingestion by Datadog, Loki, CloudWatch, or any aggregator that wants machine-parseable output. A `RequestIdProcessor` attaches a `req_` + 32-hex-char id to every record (the same id that's echoed back in the `X-Request-Id` response header and surfaced on the front-end as the Inertia prop `requestId`).
+
+```php
+// .env — opt in by adding the channel to the stack
+LOG_STACK=single,structured
+LOG_REQUEST_HEADER=X-Request-Id
+```
+
+Existing `Log::info()` / `Log::error()` calls keep working — the `stack` channel is configured to fan out to BOTH the `single` (human-readable) and `structured` (JSON) handlers, so `php artisan pail` still works and log aggregators get clean JSON at the same time.
+
+### Real rate limiting on every auth route
+
+The four single-use email-token flows (verify-resend, forgot-password, reset-password, 2FA challenge) are now per-IP throttled with named limiters registered in `App\Providers\AppServiceProvider` and bound via the `throttle:NAME` middleware on the route. Default caps (override via env):
+
+| Route                                    | Limiter                  | Default |
+|------------------------------------------|--------------------------|---------|
+| `POST /login`                            | `login`                  | 10/min  |
+| `POST /email/verify/resend`              | `verify`                 | 10/min  |
+| `POST /forgot-password`                  | `forgot-password`        | 5/min   |
+| `POST /reset-password`                   | `reset-password`         | 5/min   |
+| `POST /two-factor/challenge` (TOTP)      | `two-factor.challenge`   | 10/min  |
+| `POST /two-factor/challenge` (recovery)  | `two-factor.recovery`    | 3/min   |
+
+```dotenv
+RATE_LIMIT_VERIFY_PER_MIN=10
+RATE_LIMIT_FORGOT_PER_MIN=5
+RATE_LIMIT_RESET_PER_MIN=5
+RATE_LIMIT_2FA_CHALLENGE_PER_MIN=10
+RATE_LIMIT_2FA_RECOVERY_PER_MIN=3
+RATE_LIMIT_LOGIN_PER_MIN=10
+```
+
+Laravel automatically emits a `Retry-After` header on 429 responses, so the front-end can surface a "tente novamente em 30s" flash without extra work.
+
+The IP-level throttles pair with the existing per-user counters in `BearerTokenService` and `TwoFactorService` — a single attacker hopping IPs is still bounded by the per-user 1-per-30s / 5-per-hour caps, and a single IP attacking a single user is bounded by both layers.
+
+### Bounded `/up` health endpoint
+
+The default Laravel `/up` stub (200 with no body) is replaced with a JSON `HealthController` that runs four bounded probes and reports each one's status + latency:
+
+```bash
+$ curl -s http://localhost:8000/up
+{
+  "status": "ok",
+  "checks": {
+    "database": { "ok": true,  "latency_ms": 0.42  },
+    "queue":    { "ok": true,  "latency_ms": 0.78  },
+    "mail":     { "ok": true,  "latency_ms": 2.10  },
+    "storage":  { "ok": true,  "latency_ms": 1.55  }
+  }
+}
+```
+
+Any probe failing flips the response to **503** so uptime monitors can route alerts to the right on-call. Each probe is wrapped in a 2-second soft timeout — a slow database doesn't hold the response open. Failures are isolated: a database outage doesn't abort the queue / mail / storage checks.
+
+### Optional Sentry integration
+
+The official `sentry/sentry-laravel` package is now a hard dependency. The integration is a no-op until you set `SENTRY_LARAVEL_DSN` in your environment — empty DSN = zero behaviour change. Wire a real DSN and unhandled exceptions start landing in Sentry with the `request_id` already attached (the JSON log channel + Sentry share the same Monolog shared context).
+
+```dotenv
+SENTRY_LARAVEL_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+```
+
+### Service refactor (BearerTokenService)
+
+The four email-token flows (email verification, password reset, 2FA enrollment, 2FA disable) used to each roll their own mint / consume / throttle code. v0.10.0 extracts a single `App\Services\Auth\BearerTokenService` and turns the per-purpose services into thin adapters that pick a `purpose` value, a `meta` payload, and a post-consume handler closure. The token table is unchanged — the same `email_verification_tokens` rows with a `purpose` discriminator, SHA-256 hashed, 60-minute TTL.
+
+The public surface of `EmailVerificationService`, `PasswordResetService`, and `TwoFactorEnrollmentService` is identical to pre-refactor — every existing test passed without modification.
+
+
 
 PRs are welcome. Before opening one:
 
