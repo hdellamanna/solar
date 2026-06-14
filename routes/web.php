@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AboutController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\HealthController;
@@ -22,10 +23,12 @@ use App\Http\Controllers\PixController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurrenceController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\TutorialController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -232,6 +235,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
         Route::get('/settings/security', [SettingsController::class, 'security'])
             ->name('settings.security');
+        // FASE 4D — appearance (motion preferences)
+        Route::get('/settings/appearance', [AppearanceController::class, 'show'])
+            ->name('settings.appearance.show');
+        Route::patch('/settings/appearance', [AppearanceController::class, 'update'])
+            ->name('settings.appearance.update');
 
         // 2FA settings (Auth Phase 3).
         Route::post('/settings/security/two-factor/enable', [TwoFactorEnableController::class, 'beginEnable'])
@@ -366,3 +374,17 @@ Route::get('/pwa/{file}', function (string $file) {
         'Cache-Control' => 'public, max-age=31536000, immutable',
     ]);
 })->where('file', '[A-Za-z0-9._\-]+')->name('pwa.assets');
+
+/*
+|--------------------------------------------------------------------------
+| Public pages (FASE 4D)
+|--------------------------------------------------------------------------
+|
+| No auth required. These pages are accessible to guests and authenticated
+| users alike.
+*/
+Route::get('/about', AboutController::class)->name('about');
+Route::get('/tutorial', TutorialController::class)->name('tutorial');
+Route::get('/tutorial/{chapter}', [TutorialController::class, 'chapter'])
+    ->where('chapter', '[a-z-]+')
+    ->name('tutorial.chapter');

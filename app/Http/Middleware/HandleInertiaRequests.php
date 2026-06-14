@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\UserMotionPreference;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -36,6 +37,7 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $motionPrefs = app(UserMotionPreference::class);
 
         return [
             ...parent::share($request),
@@ -64,6 +66,10 @@ class HandleInertiaRequests extends Middleware
             // support ticket and we can grep the JSON log
             // channel for the exact request lifecycle.
             'requestId' => fn () => $request->attributes->get('request_id'),
+            // FASE 4D — motion preferences injected server-side
+            // so the first paint has the correct data attributes
+            // with no FOUC.
+            'motion' => $motionPrefs->toInertiaProps($request),
         ];
     }
 

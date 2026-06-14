@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\UserMotionPreference;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -14,7 +15,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // FASE 4D — singleton that resolves the effective motion
+        // level (auto/reduced/full) by combining the user's stored
+        // preference with the OS `prefers-reduced-motion` signal.
+        $this->app->singleton(UserMotionPreference::class, function ($app) {
+            return new UserMotionPreference($app['request']->user());
+        });
     }
 
     /**

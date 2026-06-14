@@ -109,4 +109,18 @@ class UserFactory extends Factory
             }
         });
     }
+
+    /**
+     * All motion flags off — simulates a user who has explicitly
+     * chosen reduced motion and also has the OS preference enabled.
+     */
+    public function withReducedMotion(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'motion_preference' => 'reduced',
+            'motion_backdrop'   => false,
+            'motion_spring'     => false,
+            'motion_parallax'   => false,
+        ]);
+    }
 }

@@ -20,6 +20,10 @@ class User extends Authenticatable
         'theme',
         'home_currency',
         'use_ai_categorize',
+        'motion_preference',
+        'motion_backdrop',
+        'motion_spring',
+        'motion_parallax',
     ];
 
     protected $hidden = [
@@ -34,6 +38,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'use_ai_categorize' => 'boolean',
             'last_ai_suggestion_at' => 'datetime',
+            'motion_backdrop' => 'boolean',
+            'motion_spring' => 'boolean',
+            'motion_parallax' => 'boolean',
         ];
     }
 
