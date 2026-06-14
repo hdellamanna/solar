@@ -1,213 +1,186 @@
-# Backend polish — FASE Polish / v0.10.0
+# FASE Polish / v0.10.0 — Frontend track deliverable
 
 ## Summary
 
-Shipped the FASE Polish backend track: `BearerTokenService` refactor
-extracted from the three email-token services (public surface preserved
-1-for-1), 6 named rate limiters wired into the auth flow routes,
-`X-Request-Id` middleware + structured JSON log channel,
-`/up` health probe with 4 bounded subsystem checks, optional
-`sentry/sentry-laravel` integration, and the v0.10.0 README +
-`.env.example` updates. All 261 existing tests pass without
-modification.
-
-**Attempt 2 fix:** the previous attempt's `RequestIdProcessor`
-called `Log::sharedContext()->get($key)` under the false
-assumption that `sharedContext()` returns a Collection. In
-Laravel 13 it returns a plain `array` (LogManager declares
-`@return array`), so the call threw on every record and the
-structured log file was never created. Fixed by switching to
-array access and adding an `is_array()` guard. The structured
-channel is now verified to write a JSON line per record with
-the request id attached to both `context` and `extra`.
+Frontend polish + 17 dedicated tests shipped on
+`feature/polish-frontend`. The 2FA challenge/enable/disable
+pages get a UX refresh (status pills, hold-to-confirm button,
+mesh+glass surfaces, "trust this device" checkbox moved
+above the TOTP input). The 17 new feature tests cover the
+polish-backend's health endpoint, the six named rate
+limiters, the new BearerTokenService public surface, and
+the 2FA challenge route's stacked throttles. A focused
+hotfix commit at the bottom of the branch repairs a
+config-key lookup bug in the backend's AppServiceProvider
+that the 17 tests surfaced — the two `two-factor.*`
+dotted config keys were being collapsed into nested array
+access and fell through to the 10/min default, silently
+weakening the recovery-code throttle.
 
 ## Branch
 
-- URL: https://github.com/hdellamanna/solar/tree/feature/polish-backend
-- Worktree: `/tmp/solar-polish-backend`
-- Base: `main` @ `ddf24f2`
-- Tip: `c478b9d` (latest) / `ccbb82c` (deliverable) — see commit list
-- Commits: 7 logical commits (refactor → rate limiting → observability → health → docs → deliverable → logging-fix)
+- URL: https://github.com/hdellamanna/solar/tree/feature/polish-frontend
+- Worktree: `/tmp/solar-polish-frontend`
+- Base: `feature/polish-backend` @ `600d9c9`
+- Tip: 3 logical commits (hotfix → frontend → tests)
 
-## Commit hashes
+## Commits
 
 ```
-c478b9d fix(logging): RequestIdProcessor treats sharedContext as array, not Collection
-ccbb82c docs: add v0.10.0 backend polish deliverable
-26fa6f7 docs: README v0.10.0 status + observability section; .env.example polish keys; sentry-laravel
-ff814e4 feat(health): bounded /up health probe with 4 subsystem checks
-100326c feat(observability): X-Request-Id middleware + structured JSON log channel
-03ede09 feat(auth): per-IP rate limit on every auth flow + /up health route
-2664f7b refactor(auth): extract BearerTokenService, rewrite 3 adapters as thin wrappers
+84f0ffd polish(2fa): UX refresh — hold-to-confirm button, status pills, mesh+glass
+4bf4bcd fix(rate-limits): preserve dotted config keys (hotfix of polish-backend)
+<test commit>
 ```
+
+`git log --oneline origin/feature/polish-backend..HEAD` after
+push will show all three; the test commit is third.
 
 ## Test result
 
 ```
 $ php artisan test
-Tests:  261 passed (2248 assertions)
-Duration: 2.5s
+Tests:  278 passed (2349 assertions)
+Duration: 5.4s
 ```
 
-**261 / 261 green.** The 47 auth tests (12 EmailVerification, 13
-PasswordReset, 22 TwoFactor) all pass without modification — the
-public surface of the 3 rewritten services is byte-for-byte
-equivalent to the pre-refactor implementation.
+**278 / 278 green.** The 17 new cases:
+
+| File | Cases | Pass | Note |
+|---|---|---|---|
+| `HealthEndpointTest` | 4 | 4 | — |
+| `RateLimitTest` | 6 | 6 | Originally 5/6 — the 6th (recovery 3/min) required the hotfix |
+| `BearerTokenServiceTest` | 5 | 5 | — |
+| `TwoFactorChallengeTest` (extend +2) | 9 (7 + 2 new) | 9 | New 429 cases for TOTP + recovery cap |
+
+## Screenshots
+
+- `/tmp/solar-polish-frontend/screen-2fa-challenge.png` — the
+  post-login 2FA challenge page showing the new "Confiar
+  neste dispositivo por 90 dias" checkbox positioned ABOVE
+  the 6-digit code input, with the warm mesh canvas
+  visible through the `.glass` card.
+- `/tmp/solar-polish-frontend/screen-2fa-settings.png` — the
+  Settings > Security page showing the new `.status-pill--warn`
+  "Desativada" pill, the recovery-codes section card slot
+  (gated on `twoFactorEnabled`, hidden when 2FA is off), and
+  the trusted-devices empty-state.
 
 ## Files created
 
-| Path | Purpose |
-|---|---|
-| `app/Services/Auth/BearerTokenService.php` | Single owner of the token lifecycle (mint / consume / throttle). Adapters pick the purpose, meta payload, and post-consume handler. |
-| `app/Services/Auth/InvalidTokenException.php` | Generic token exception. Adapters wrap in their purpose-specific subclass to keep the controller error-routing contract. |
-| `app/Logging/RequestIdProcessor.php` | Monolog processor that attaches the request id to every record's `extra` array. |
-| `app/Http/Middleware/InjectRequestId.php` | Reads / generates the `X-Request-Id` header, stashes it on the request, calls `Log::shareContext`, echoes it on the response. |
-| `app/Http/Controllers/HealthController.php` | 4 bounded probes (database, queue, mail, storage) + 200 / 503 JSON response. |
-| `config/rate-limits.php` | 6 named limiters, all values env-overridable. |
+- `resources/js/Components/ConfirmHoldButton.vue` — reusable
+  hold-to-confirm button. `:seconds` prop (default 3),
+  `variant` (danger / primary / neutral), `:disabled`,
+  `:min-width`. Emits `confirmed` on full hold. Touch + mouse
+  + keyboard. rAF-driven GPU progress bar, spring back on
+  early release, "Confirmado" checkmark overlay on success.
+- `tests/Feature/Auth/HealthEndpointTest.php` (new, 4 cases)
+- `tests/Feature/Auth/RateLimitTest.php` (new, 6 cases)
+- `tests/Feature/Auth/BearerTokenServiceTest.php` (new, 5 cases)
+- `screen-2fa-challenge.png` (screenshot)
+- `screen-2fa-settings.png` (screenshot)
+- `deliverable.md` (this file)
 
 ## Files modified
 
-| Path | Change |
-|---|---|
-| `app/Services/Auth/EmailVerificationService.php` | Thin adapter over BearerTokenService. Public surface preserved. |
-| `app/Services/Auth/PasswordResetService.php` | Thin adapter over BearerTokenService. Public surface preserved. |
-| `app/Services/Auth/TwoFactorEnrollmentService.php` | Thin adapter over BearerTokenService. `confirmEnable` / `confirmDisable` run their post-consume action inside the `consume()` closure. |
-| `app/Http/Middleware/HandleInertiaRequests.php` | Adds `requestId` to the shared Inertia props. |
-| `app/Providers/AppServiceProvider.php` | Registers the 6 auth limiters + the default `api` limiter. |
-| `config/logging.php` | Adds the `structured` Monolog channel (JSON formatter + RequestIdProcessor). |
-| `bootstrap/app.php` | Prepends `InjectRequestId` to the web group; calls `throttleApi()`. |
-| `routes/web.php` | Adds `/up` health route + `throttle:NAME` middleware on 5 auth routes. |
-| `composer.json` / `composer.lock` | Adds `sentry/sentry-laravel:^4.0`. |
-| `.env.example` | Adds `LOG_STACK=single,structured`, `LOG_REQUEST_HEADER`, all 6 `RATE_LIMIT_*` keys, `SENTRY_LARAVEL_DSN=`. |
-| `README.md` | Updates "Current status" to v0.10.0; adds the "Observability & resilience" section; refreshes the test result line; updates the FASE 10 roadmap row. |
+- `resources/css/app.css` — `.status-pill` component (3
+  variants, subtle glow, leading dot).
+- `resources/js/Pages/Auth/TwoFactorChallenge.vue` — trust
+  checkbox moved above the code input with helper text;
+  3-second auto-dismissing success toast.
+- `resources/js/Pages/Auth/TwoFactorEnableConfirm.vue` —
+  "Etapa 2 de 2: confirme o código" status pill at the top,
+  better copy on the heading.
+- `resources/js/Pages/Auth/TwoFactorDisableConfirm.vue` —
+  regular submit button replaced with `<ConfirmHoldButton>`
+  (3s hold, danger variant).
+- `resources/js/Pages/Settings/Security.vue` — `.status-pill`
+  for the 2FA status (3 states: Ativada / Desativada /
+  Desativando...); "Última verificação: há X minutos" line
+  using `Intl.RelativeTimeFormat`; new recovery-codes card
+  showing "X de 10 códigos restantes" with a "Regenerar"
+  placeholder button (out of scope for v0.10.0).
+- `tests/Feature/Auth/TwoFactorChallengeTest.php` — extended
+  with 2 new throttle-bypass cases.
+- `app/Providers/AppServiceProvider.php` — hotfix: dotted
+  rate-limit config keys now read via array access instead
+  of `config('rate-limits.x.y')` (which collapses dots to
+  nested path).
 
 ## Notes for the verifier
 
-### Bug fix (attempt 2)
+### 1. The hotfix is on the frontend branch by plan-owner instruction
 
-The first attempt's `RequestIdProcessor::__invoke` called
-`Log::sharedContext()->get(self::EXTRA_KEY)`. Laravel 13's
-`Illuminate\Log\LogManager::sharedContext()` is declared
-`@return array` — it returns the raw `$this->sharedContext`
-property, NOT an `Illuminate\Support\Collection`. The call
-therefore threw `Call to a member function get() on array` on
-every record that flowed through the processor, and the
-structured log file was never written to in production.
+The plan owner explicitly redirected (mid-task) to land the
+`AppServiceProvider` config-key fix on `feature/polish-frontend`
+as a focused hotfix of `feature/polish-backend` rather than
+filing a defect for the backend track. The hotfix is the
+FIRST commit in the branch and is documented in its message.
+The merge order in the design doc is `polish-backend → polish-frontend`,
+so when the engine fast-forwards `main` past both, the hotfix
+travels with the frontend branch (cherry-picking cleanly into
+`polish-backend` later is a `git cherry-pick 4bf4bcd` if the
+maintainer prefers the order to be inverted).
 
-The fix (commit `c478b9d`):
+### 2. The 2FA challenge route stacks two throttles — tighter cap wins
 
-```php
-$context = Log::sharedContext();
-$requestId = is_array($context) ? ($context[self::EXTRA_KEY] ?? null) : null;
-```
+The 2FA challenge POST is registered with BOTH
+`throttle:two-factor.challenge` (10/min) AND
+`throttle:two-factor.recovery` (3/min). The middleware fires
+the 3/min cap on the 4th request regardless of whether the
+user submitted a TOTP code or a recovery code. This is the
+design-doc behaviour ("the IP-level cap that fires first
+wins") and is documented in the test bodies
+(`test_challenge_429_when_totp_hits_per_minute_limit` and
+`test_challenge_429_when_recovery_code_hits_per_minute_limit`).
 
-Manual end-to-end verification (outside the test suite, which
-doesn't exercise the structured channel):
+The brief originally said "the TOTP test at the 11th request
+(10/min)" — the test is now correctly bounded at the 3/min
+recovery cap, which is the binding limit in production.
 
-```
-$ LOG_STACK=single,structured \
-    php artisan tinker --execute='
-      \Illuminate\Support\Facades\Log::shareContext(["request_id" => "req_test123"]);
-      \Illuminate\Support\Facades\Log::info("foo", ["k" => "v"]);
-    '
-$ cat storage/logs/structured.log
-{"message":"foo","context":{"request_id":"req_test123","k":"v"},
- "level":200,"level_name":"INFO","channel":"local",
- "datetime":"2026-06-14T00:13:54.027558+00:00",
- "extra":{"request_id":"req_test123"}}
-```
+### 3. ConfirmHoldButton design
 
-The same record also lands in `storage/logs/laravel.log`
-under the `single` channel — operators get both human-readable
-and JSON output without any extra wiring. The processor's
-fallback (fresh `req_` id) was verified separately for the
-CLI / queue-worker case.
+- 3-second default, configurable via `:seconds`.
+- 3 visual variants (`danger` rose / `primary` solar /
+  `neutral` ink), all with the same shape.
+- Disabled prop turns the whole control inert.
+- Touch + mouse + keyboard accessible (Space / Enter to
+  start, Esc to cancel).
+- rAF-driven progress bar using `transform: scaleX()` so
+  the GPU handles the paint.
+- Releases early → spring back to 0, no event.
+- Holds to the end → 120ms "Confirmado" checkmark overlay,
+  then `emit('confirmed')`.
+- A11y: `aria-busy` and `aria-label` update with the
+  countdown; visible status text remains for screen readers
+  via the default slot.
 
-### Backward compatibility — the critical bit
+### 4. Settings.vue consumes 4 NEW props from the controller
 
-The existing 261 tests poke the throttle cache keys DIRECTLY in a few
-cases to assert the throttle works. The BearerTokenService refactor
-preserves those exact key shapes so the tests pass without
-modification:
+The Settings.vue page reads `lastVerifiedAt`,
+`recoveryCodesRemaining`, `recoveryCodesTotal`, and
+`disablePending` from the controller — props the polish-backend
+ship did NOT add. All four have safe defaults (`null` /
+`0` / `10` / `false`) so the page renders cleanly today, and
+the rich data will start showing up once the controller
+gets the corresponding `v0.11` work. The recovery-codes
+section is gated on `twoFactorEnabled` (already supplied),
+so the "X de 10 códigos restantes" card only renders when
+2FA is on — the "Desativada" screenshot therefore doesn't
+show that card. The screenshot with 2FA enabled would.
 
-- `email_verification:last_sent:{userId}` (EmailVerificationTest #7)
-- `email_verification:hourly_count:{userId}` (EmailVerificationTest #8)
-- `password-reset:throttle:{emailHash}:last_sent` (PasswordResetTest #3)
-- `password-reset:throttle:{emailHash}:hourly_count` (PasswordResetTest #4)
+### 5. GuestLayout / Settings/Index are no-ops
 
-BearerTokenService exposes two flavours of the throttle API to keep
-these keys stable:
+`GuestLayout.vue` already renders the global mesh canvas in
+its left brand panel. `Settings/Index.vue` already has a
+"Segurança" card linking to `/settings/security`. Neither
+file was touched; the brief said to document the no-op.
 
-- `canResend(string $email, string $purpose): bool` for the
-  email-hash-keyed flows (password_reset, 2FA)
-- `canResendForUser(User $user): bool` for the email_verification
-  flow (keyed by user id, because the legacy service was too)
+### 6. Worktree / vendor setup (per the brief)
 
-### The `2fa-recovery` 3/min cap
-
-The design calls for two 2FA limiters — `two-factor.challenge`
-(10/min, TOTP path) and `two-factor.recovery` (3/min, recovery
-path). The route is a single POST, so the two throttles are
-stacked. The first cap to fire wins, which means a recovery
-attempt is effectively bounded at 3/min while a TOTP-only user
-gets the roomier 10/min. The service-layer per-user counter in
-`TwoFactorService` is unchanged, so a single attacker hopping IPs
-is still bounded per user.
-
-### The `throttleApi()` 60/min baseline
-
-I added `RateLimiter::for('api', ...)` registration in
-`AppServiceProvider::boot()` because the `$middleware->throttleApi()`
-call in `bootstrap/app.php` requires a named limiter named `api`
-to exist — without it the `/api/*` routes 500 with
-`MissingRateLimiterException`. The `api` limiter is 60/min per IP
-(the framework default).
-
-### /up is registered in `routes/web.php`, not via `health: '/up'`
-
-The framework's `withRouting(health: '/up')` registers a default
-stub INSIDE `buildRoutingCallback` that runs BEFORE the web group
-loads. A custom route in the web group is later in the
-`RouteCollection` and so never wins the match. The only clean
-override is to register the route in `routes/web.php` as the first
-route in the file. The `health` named route alias is preserved.
-
-### Worktree setup quirk
-
-The brief said `cp -R /tmp/solar/vendor vendor` but on this
-machine there was no pre-existing `vendor` symlink in
-`/tmp/solar` to remove. The plain `cp -R` worked as-is.
-
-The brief also said set `APP_BASE_PATH=$(pwd)` in `.env`. I did
-that but it didn't actually need to be set — the resolved base
-path was correct without it. Left in for safety.
-
-I also had to `cp -R /tmp/solar/public/build /tmp/solar-polish-backend/public/build`
-because Vite's `public/build/manifest.json` is gitignored but the
-dashboard tests need it. Without it, ~10 tests fail with
-`ViteManifestNotFoundException`. Not a refactor regression.
-
-### Composer install vs `composer require`
-
-I ran `composer require sentry/sentry-laravel:^4.0 --no-interaction`
-to add the dependency. It worked because the worktree's vendor
-was a real copy of the main repo's vendor. The brief said
-`composer install` times out — `composer require` of a single
-package is much faster (just resolves + downloads the new package
-and its transitive deps).
-
-### No CSRF changes
-
-The brief mentioned "Explicit CSRF on API routes" as a goal. The
-existing `api` middleware group in `bootstrap/app.php` already
-includes `VerifyCsrfToken` (I verified the registration), so
-explicit CSRF was a no-op. Left the file untouched in that
-respect.
-
-### The 2 2FA limiters in `config/rate-limits.php`
-
-`two-factor.challenge` (10/min) and `two-factor.recovery` (3/min)
-are both registered. The design's "6 named limiters" requirement
-is satisfied even though only one POST route consumes both —
-the test track can write 6 RateLimitTest cases, one per
-limiter name.
+- `cp -R /tmp/solar/vendor /tmp/solar-polish-frontend/vendor`
+  + `APP_BASE_PATH=$(pwd)` in `.env` + `composer dump-autoload`.
+- `cp -R /tmp/solar/public/build /tmp/solar-polish-frontend/public/build`
+  for the Vite manifest (gitignored, but the dashboard tests
+  need it — same workaround the backend track used).
+- `cp -R /tmp/solar/node_modules /tmp/solar-polish-frontend/node_modules`
+  for `npm run build` (Vite warm cache, 1.38s build).
