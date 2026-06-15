@@ -1,20 +1,33 @@
 <script setup>
 /*
- * Settings — index (FASE 4D / Auth Phase 3).
+ * Settings — index (FASE 4D / Auth Phase 3 / FASE 7 i18n).
  *
- * Landing page for the future settings surface. Currently only
- * lists the Security subsection (2FA + trusted devices). New
- * subsections (notifications, data export, theme tweaks) will be
- * added here as the design lands.
+ * Landing page for the settings surface. Cards are listed in the
+ * order: Segurança, Perfil, Idioma, Aparência, then the future
+ * "Inteligência artificial" placeholder.
  */
 import { Head, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { useLocale } from '@/Composables/useLocale';
+import { useT } from '@/Composables/useT';
+import { computed } from 'vue';
 
-const settingsSections = [
+const { locale: activeLocale, available: availableLocales } = useLocale();
+const { t } = useT();
+
+// Resolve the human label for the active locale so the Idioma
+// card can show "Português (Brasil)" instead of "pt-BR".
+const activeLocaleLabel = computed(() => {
+    const code = activeLocale.value;
+    const match = availableLocales.value.find((l) => l.code === code);
+    return match ? match.name : code;
+});
+
+const settingsSections = computed(() => [
     {
         key: 'security',
         href: 'settings.security',
-        name: 'Seguranca',
+        name: t('app.security'),
         description: 'Verificacao em duas etapas, dispositivos confiaveis, sessoes ativas.',
         icon: 'M12 2l8 4v6c0 5-3.5 9.4-8 10-4.5-.6-8-5-8-10V6l8-4z',
         accent: 'from-primary-500 to-primary-700',
@@ -22,15 +35,23 @@ const settingsSections = [
     {
         key: 'profile',
         href: 'profile.edit',
-        name: 'Perfil',
+        name: t('app.profile'),
         description: 'Nome, email, tema preferido e a preferencia de categoria por IA.',
         icon: 'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zm13 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
         accent: 'from-solar-500 to-solar-600',
     },
     {
+        key: 'idioma',
+        href: 'settings.idioma.show',
+        name: t('app.language'),
+        description: 'Idioma da interface. Atual: ' + activeLocaleLabel.value + '.',
+        icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a14 14 0 010 20M12 2a14 14 0 000 20',
+        accent: 'from-emerald-500 to-teal-700',
+    },
+    {
         key: 'appearance',
         href: 'settings.appearance.show',
-        name: 'Aparencia',
+        name: t('app.appearance'),
         description: 'Animacoes, intensidade do glass e parallax. Respeita a preferencia do sistema.',
         icon: 'M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3',
         accent: 'from-amber-500 to-amber-700',
@@ -45,7 +66,7 @@ const settingsSections = [
         disabled: true,
         badge: 'Em breve',
     },
-];
+]);
 </script>
 
 <template>
