@@ -28,6 +28,7 @@ return [
     'register' => 'Criar conta',
     'dashboard' => 'Painel',
     'accounts' => 'Contas',
+    'about' => 'Sobre',
     'transactions' => 'Transações',
     'subscriptions' => 'Assinaturas',
     'goals' => 'Metas',
