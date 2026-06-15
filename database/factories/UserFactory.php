@@ -34,7 +34,27 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // FASE 7 — i18n tri-língue. New users default to
+            // pt-BR (the app's default locale). Override via the
+            // `withLocale()` state method.
+            'locale' => 'pt-BR',
         ];
+    }
+
+    /**
+     * FASE 7 — set a specific locale on the factory-built user.
+     *
+     * Example:
+     *   User::factory()->withLocale('es')->create();
+     */
+    public function withLocale(string $locale): static
+    {
+        if (! in_array($locale, ['pt-BR', 'es', 'en'], true)) {
+            throw new \InvalidArgumentException("Unsupported locale [{$locale}]");
+        }
+        return $this->state(fn (array $attributes) => [
+            'locale' => $locale,
+        ]);
     }
 
     /**

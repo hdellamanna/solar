@@ -12,9 +12,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * User-defined tag attached to transactions.
  * Slug is unique per user.
  *
+ * FASE 7 — i18n: the tag carries a `name` column (kept for
+ * pre-FASE-7 query compatibility — see the
+ * `add_localized_names_to_tags_table` migration for the rationale)
+ * plus three localized variants (`name_pt`, `name_es`, `name_en`).
+ * The `getNameAttribute()` accessor returns the active locale's
+ * value with the same fallback chain as {@see Category::getNameAttribute()}.
+ *
+ * Slug is derived from the stable `name_pt` value (not the localized
+ * accessor) so it stays consistent across locale changes — the
+ * TagController's slug generator reads `$tag->name_pt` explicitly.
+ *
  * @property int $id
  * @property int $user_id
- * @property string $name
+ * @property string $name         (legacy column; kept in sync with name_pt)
+ * @property string|null $name_pt
+ * @property string|null $name_es
+ * @property string|null $name_en
  * @property string $slug
  * @property string|null $color
  * @property string|null $icon
@@ -29,6 +43,9 @@ class Tag extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'name_pt',
+        'name_es',
+        'name_en',
         'slug',
         'color',
         'icon',
@@ -83,5 +100,64 @@ class Tag extends Model
     public function scopeAccessibleBy($query, int $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    /**
+     * FASE 7 — i18n accessor: same shape as
+     * {@see Category::getNameAttribute()} — falls back through the
+     * 3 localized columns, then the legacy `name` column, then
+     * `#<id>`.
+     */
+    public function getNameAttribute(): string
+    {
+        $locale = (string) app()->getLocale();
+        $short = strtolower(explode('-', $locale)[0] ?? 'pt');
+        $key = "name_{$short}";
+
+        $rawName = $this->getAttributes()['name'] ?? null;
+        $candidate = $this->getAttributes()[$key]
+            ?? $this->getAttributes()['name_pt']
+            ?? $this->getAttributes()['name_es']
+            ?? $this->getAttributes()['name_en']
+            ?? (is_string($rawName) ? $rawName : null);
+
+        if (is_string($candidate) && $candidate !== '') {
+            return $candidate;
+        }
+
+        return "#{$this->id}";
+    }
+
+    /**
+     * FASE 7 — i18n boot hook. Mirrors Category's: keeps the legacy
+     * `name` column in sync with `name_pt` for pre-FASE-7 query
+     * patterns.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function (Tag $tag): void {
+            $tag->syncLegacyNameFromLocalized();
+        });
+
+        static::updating(function (Tag $tag): void {
+            $tag->syncLegacyNameFromLocalized();
+        });
+    }
+
+    /**
+     * Mirrors {@see Category::syncLegacyNameFromLocalized()}.
+     * Writes through `setAttribute()` to bypass the magic
+     * `getNameAttribute()` accessor (the accessor would otherwise
+     * fire on the read of `$this->name` and mask the assignment).
+     */
+    private function syncLegacyNameFromLocalized(): void
+    {
+        $rawName = $this->getAttributes()['name'] ?? null;
+        $rawNamePt = $this->getAttributes()['name_pt'] ?? null;
+        if (empty($rawName) && ! empty($rawNamePt)) {
+            $this->setAttribute('name', $rawNamePt);
+        }
     }
 }
