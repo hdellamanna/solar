@@ -113,7 +113,12 @@ class TutorialController extends Controller
 
     private function tutorialPath(string $locale): string
     {
-        return lang_path(str_replace('-', '_', $locale) . '/tutorial.php');
+        // The lang directory is named exactly after the locale code
+        // (e.g. `pt-BR/`), so we must NOT rewrite the dash to an
+        // underscore — `pt-BR` was being sanitised to `pt_BR` and
+        // producing a non-existent path, which caused pt-BR users
+        // to silently fall through to the English fallback file.
+        return lang_path("{$locale}/tutorial.php");
     }
 
     private function slugExists(string $slug): bool
