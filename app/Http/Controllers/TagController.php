@@ -32,36 +32,47 @@ class TagController extends Controller
     }
 
     /**
-     * Store a new tag. Slug is auto-generated from the name.
+     * Store a new tag. Slug is auto-generated from the pt-BR name
+     * (the stable source — slug is internal, never user-facing).
      */
     public function store(StoreTagRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        $data = $request->normalizedData();
         $userId = Auth::id();
 
         Tag::create([
             'user_id' => $userId,
             'name'    => $data['name'],
+            // FASE 7 — i18n tri-língue. The 3 localized variants
+            // are persisted alongside the legacy `name` column. The
+            // model's `creating` event keeps `name` in sync with
+            // `name_pt` for backward compat.
+            'name_pt' => $data['name_pt'] ?? $data['name'],
+            'name_es' => $data['name_es'] ?? null,
+            'name_en' => $data['name_en'] ?? null,
             'slug'    => $this->uniqueSlug($userId, $data['name']),
             'color'   => $data['color'] ?? '#6b7280',
             'icon'    => $data['icon'] ?? null,
         ]);
 
-        return redirect()->route('tags.index')->with('success', 'Tag criada.');
+        return redirect()->route('tags.index')->with('success', __('app.tag_created'));
     }
 
     /**
-     * Update a tag. Slug is regenerated if the name changes.
+     * Update a tag. Slug is regenerated if the pt-BR name changes.
      */
     public function update(UpdateTagRequest $request, Tag $tag): RedirectResponse
     {
         abort_unless($tag->user_id === Auth::id(), 403);
 
-        $data = $request->validated();
+        $data = $request->normalizedData();
         $tag->fill([
-            'name'  => $data['name'],
-            'color' => $data['color'] ?? '#6b7280',
-            'icon'  => $data['icon'] ?? null,
+            'name'    => $data['name'],
+            'name_pt' => $data['name_pt'] ?? $data['name'],
+            'name_es' => $data['name_es'] ?? $tag->name_es,
+            'name_en' => $data['name_en'] ?? $tag->name_en,
+            'color'   => $data['color'] ?? '#6b7280',
+            'icon'    => $data['icon'] ?? null,
         ]);
 
         if ($tag->isDirty('name')) {
@@ -70,7 +81,7 @@ class TagController extends Controller
 
         $tag->save();
 
-        return redirect()->route('tags.index')->with('success', 'Tag atualizada.');
+        return redirect()->route('tags.index')->with('success', __('app.tag_updated'));
     }
 
     /**
@@ -81,7 +92,7 @@ class TagController extends Controller
         abort_unless($tag->user_id === Auth::id(), 403);
         $tag->delete();
 
-        return redirect()->route('tags.index')->with('success', 'Tag removida.');
+        return redirect()->route('tags.index')->with('success', __('app.tag_deleted'));
     }
 
     /**
@@ -100,7 +111,7 @@ class TagController extends Controller
 
         $tag->transactions()->syncWithoutDetaching([$transaction->id]);
 
-        return back()->with('success', 'Tag vinculada.');
+        return back()->with('success', __('app.tag_attached'));
     }
 
     /**
@@ -113,7 +124,7 @@ class TagController extends Controller
 
         $tag->transactions()->detach($transaction->id);
 
-        return back()->with('success', 'Tag removida da transação.');
+        return back()->with('success', __('app.tag_detached'));
     }
 
     /**

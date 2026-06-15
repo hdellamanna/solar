@@ -87,6 +87,22 @@ class HandleInertiaRequests extends Middleware
                     'ai_agent' => (bool) config('features.ai_agent', false),
                 ],
             ],
+            // FASE 7 — i18n tri-língue. The Vue side reads
+            //   usePage().props.app.locale
+            //   usePage().props.app.available_locales
+            //   usePage().props.app.brand
+            // to render the language switcher, format enum
+            // labels, and pick the localized brand string.
+            // The whole block is wrapped in a try/catch (see
+            // `safeTrans`) so a missing lang file on a fresh
+            // install — or a lang file that throws because the
+            // translator cannot resolve a key — does not 500
+            // the request.
+            'app' => [
+                'locale' => fn () => app()->getLocale(),
+                'available_locales' => fn () => $this->safeAvailableLocales(),
+                'brand' => fn () => $this->safeTrans('app.brand', 'Solar Money'),
+            ],
         ];
     }
 
@@ -108,6 +124,56 @@ class HandleInertiaRequests extends Middleware
         } catch (\Throwable $e) {
             return $default;
         }
+    }
+
+    /**
+     * Resolve a translation key with a fallback. The translator can
+     * throw if the file is missing or the JSON store is unreachable;
+     * we return the fallback so a misconfigured locale never breaks
+     * the page render.
+     */
+    private function safeTrans(string $key, string $fallback): string
+    {
+        try {
+            $value = trans($key);
+            // `trans()` returns the key itself when the key is
+            // missing — that is the same as "no translation",
+            // so we use the fallback instead.
+            if (is_string($value) && $value !== $key) {
+                return $value;
+            }
+        } catch (\Throwable $e) {
+            // fall through
+        }
+        return $fallback;
+    }
+
+    /**
+     * Build the `available_locales` Inertia prop. Each entry is a
+     * `{code, name, english_name}` triple the language switcher
+     * uses. Sorted in the same order as `config('app.available_locales')`.
+     *
+     * @return array<int, array{code: string, name: string, english_name: string}>
+     */
+    private function safeAvailableLocales(): array
+    {
+        $labels = [
+            'pt-BR' => ['name' => 'Português (Brasil)', 'english' => 'Portuguese (Brazil)'],
+            'es'    => ['name' => 'Español',           'english' => 'Spanish'],
+            'en'    => ['name' => 'English',            'english' => 'English'],
+        ];
+
+        $codes = (array) config('app.available_locales', ['pt-BR', 'es', 'en']);
+        $out = [];
+        foreach ($codes as $code) {
+            $label = $labels[$code] ?? ['name' => $code, 'english' => $code];
+            $out[] = [
+                'code' => $code,
+                'name' => $label['name'],
+                'english_name' => $label['english'],
+            ];
+        }
+        return $out;
     }
 
     /**
