@@ -90,7 +90,10 @@ class PasswordResetService
             ['token' => $minted['raw']],
         );
 
-        Mail::to($user->email)->send(new PasswordResetMail($user, $url));
+        // FASE 7 — i18n: pin the Mailable to the recipient's locale.
+        Mail::to($user->email)
+            ->locale($user->locale ?? config('app.locale'))
+            ->send(new PasswordResetMail($user, $url));
 
         $this->tokens->bumpResendCounter(
             $this->tokens->resendThrottleKey($email, EmailVerificationToken::PURPOSE_PASSWORD_RESET),

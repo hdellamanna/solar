@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ativar verificacao em duas etapas - Solar Money</title>
+    <title>{{ __('mail.2fa_enroll.subject') }}</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 32px; }
         table { border-collapse: collapse; }
@@ -46,23 +46,24 @@
 </head>
 <body>
     <div class="container">
-        <div class="logo">Solar Money</div>
-        <h1 class="headline">Ativar verificacao em duas etapas</h1>
+        <div class="logo">{{ __('mail.common.brand') }}</div>
+        <h1 class="headline">{{ __('mail.2fa_enroll.greeting') }}</h1>
         <p class="body">
-            Ola {{ $user->name }}, voce solicitou a ativacao da verificacao em duas etapas (2FA) na sua conta do Solar Money.
+            {{ __('mail.2fa_enroll.intro', ['name' => $user->name]) }}
         </p>
         <ol class="steps">
-            <li>Clique no botao abaixo para abrir a pagina de confirmacao.</li>
-            <li>Escaneie o QR code com seu app autenticador (Google Authenticator, 1Password, Authy, etc.).</li>
-            <li>Digite o codigo de 6 digitos gerado pelo app para concluir a ativacao.</li>
+            <li>{{ __('mail.2fa_enroll.step_1') }}</li>
+            <li>{{ __('mail.2fa_enroll.step_2') }}</li>
+            <li>{{ __('mail.2fa_enroll.step_3') }}</li>
         </ol>
         <p style="text-align: center; margin: 32px 0;">
-            <a href="{{ $confirmUrl }}" class="btn">Ativar 2FA</a>
+            <a href="{{ $confirmUrl }}" class="btn">{{ __('mail.2fa_enroll.action') }}</a>
         </p>
-        <p class="muted">Ou cole este link no navegador:</p>
+        <p class="muted">{{ __('mail.2fa_enroll.fallback_url_label') }}</p>
         <p class="url">{{ $confirmUrl }}</p>
         <p class="muted">
-            O link expira em 60 minutos. Se voce nao solicitou isso, ignore este email — sua conta permanecera inalterada.
+            {{ __('mail.2fa_enroll.expire') }}
+            {{ __('mail.2fa_enroll.footer') }}
         </p>
     </div>
 </body>

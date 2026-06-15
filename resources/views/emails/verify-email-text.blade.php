@@ -1,12 +1,10 @@
-Olá {{ $user->name }},
+{{ __('mail.common.brand') }}
 
-Clique no link abaixo para confirmar seu email e começar a usar o Solar Money.
-O link expira em 60 minutos.
+{{ __('mail.verify.greeting') }}
+
+{{ __('mail.verify.intro', ['name' => $user->name]) }}
+{{ __('mail.verify.expire') }}
 
 {{ $verificationUrl }}
 
-Se você não criou essa conta, ignore este email.
-
---
-Solar Money
-Suas finanças, com luz própria.
+{{ __('mail.verify.footer') }}

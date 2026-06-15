@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Confirme seu email - Solar Money</title>
+    <title>{{ __('mail.verify.subject') }}</title>
     <style>
         /* Resets */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 32px; }
@@ -51,18 +51,18 @@
 </head>
 <body>
     <div class="container">
-        <div class="logo">Solar Money</div>
-        <h1 class="headline">Confirme seu email</h1>
+        <div class="logo">{{ __('mail.common.brand') }}</div>
+        <h1 class="headline">{{ __('mail.verify.greeting') }}</h1>
         <p class="body">
-            Olá {{ $user->name }}, clique no botão abaixo para confirmar seu email
-            e começar a usar o Solar Money. O link expira em 60 minutos.
+            {{ __('mail.verify.intro', ['name' => $user->name]) }}
+            {{ __('mail.verify.expire') }}
         </p>
         <p style="text-align: center; margin: 32px 0;">
-            <a href="{{ $verificationUrl }}" class="btn">Confirmar email</a>
+            <a href="{{ $verificationUrl }}" class="btn">{{ __('mail.verify.action') }}</a>
         </p>
-        <p class="muted">Ou cole este link no navegador:</p>
+        <p class="muted">{{ __('mail.verify.fallback_url_label') }}</p>
         <p class="url">{{ $verificationUrl }}</p>
-        <p class="muted">Se você não criou essa conta, ignore este email.</p>
+        <p class="muted">{{ __('mail.verify.footer') }}</p>
     </div>
 </body>
 </html>

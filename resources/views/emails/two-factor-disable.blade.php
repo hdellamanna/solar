@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Desativar verificacao em duas etapas - Solar Money</title>
+    <title>{{ __('mail.2fa_disable.subject') }}</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 32px; }
         table { border-collapse: collapse; }
@@ -54,21 +54,22 @@
 </head>
 <body>
     <div class="container">
-        <div class="logo">Solar Money</div>
-        <h1 class="headline">Desativar verificacao em duas etapas</h1>
+        <div class="logo">{{ __('mail.common.brand') }}</div>
+        <h1 class="headline">{{ __('mail.2fa_disable.greeting') }}</h1>
         <div class="warning">
-            <strong>Atencao:</strong> desativar a verificacao em duas etapas remove uma camada importante de protecao da sua conta. Qualquer pessoa com acesso a sua senha podera entrar.
+            <strong>{{ __('mail.common.brand') }}:</strong> {{ __('mail.2fa_disable.warning') }}
         </div>
         <p class="body">
-            Ola {{ $user->name }}, voce solicitou a desativacao da verificacao em duas etapas. Clique no botao abaixo e confirme sua senha para concluir.
+            {{ __('mail.2fa_disable.intro', ['name' => $user->name]) }}
         </p>
         <p style="text-align: center; margin: 32px 0;">
-            <a href="{{ $confirmUrl }}" class="btn-danger">Desativar 2FA</a>
+            <a href="{{ $confirmUrl }}" class="btn-danger">{{ __('mail.2fa_disable.action') }}</a>
         </p>
-        <p class="muted">Ou cole este link no navegador:</p>
+        <p class="muted">{{ __('mail.2fa_disable.fallback_url_label') }}</p>
         <p class="url">{{ $confirmUrl }}</p>
         <p class="muted">
-            O link expira em 60 minutos. Se voce nao solicitou isso, ignore este email — sua conta permanecera protegida.
+            {{ __('mail.2fa_disable.expire') }}
+            {{ __('mail.2fa_disable.footer') }}
         </p>
     </div>
 </body>
