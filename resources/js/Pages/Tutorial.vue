@@ -1,58 +1,141 @@
 <script setup>
 /**
- * Tutorial — index page listing the 6 chapters as glass cards.
- * Each card has a small inline SVG illustration and a slug.
+ * Tutorial — FASE 4D + FASE 7 (i18n tri-língue).
+ *
+ * The controller passes a `chapters` array (6 entries) with
+ * `slug`, `title`, `subtitle`, `body`, `icon` — all already
+ * locale-aware because the controller reads from
+ * `lang/{current_locale}/tutorial.php`. When `activeChapter`
+ * is a non-null slug, the page renders that chapter's
+ * `body` as paragraphs plus the matching `Demo*` component.
  */
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed, onMounted, ref } from 'vue';
+import { useT } from '@/Composables/useT';
+
+// Demo* components — one per chapter. They keep their own
+// mock data, but their copy is pulled from `useT()`.
+import DemoContasCategorias from '@/Components/Tutorial/DemoContasCategorias.vue';
+import DemoTransacoes from '@/Components/Tutorial/DemoTransacoes.vue';
+import DemoMetasOrcamentos from '@/Components/Tutorial/DemoMetasOrcamentos.vue';
+import DemoPixTransferencias from '@/Components/Tutorial/DemoPixTransferencias.vue';
+import DemoInvestimentosDividas from '@/Components/Tutorial/DemoInvestimentosDividas.vue';
+import DemoSeguranca from '@/Components/Tutorial/DemoSeguranca.vue';
 
 const props = defineProps({
     chapters: { type: Array, default: () => [] },
+    activeChapter: { type: String, default: null },
 });
 
-const defaultChapters = [
-    { slug: 'contas-categorias', title: 'Contas e categorias', icon: 'wallet', summary: 'Crie contas, monte a arvore de categorias que faz sentido pra voce.' },
-    { slug: 'transacoes', title: 'Transacoes', icon: 'arrows', summary: 'Receitas, despesas, transferencias entre contas e splits.' },
-    { slug: 'metas-orcamentos', title: 'Metas e orcamentos', icon: 'target', summary: 'Defina uma meta, acompanhe, receba um aviso se sair do trilho.' },
-    { slug: 'pix-transferencias', title: 'PIX e transferencias', icon: 'flash', summary: 'Registre PIX in/out e veja o saldo correndo em tempo real.' },
-    { slug: 'investimentos-dividas', title: 'Investimentos e dividas', icon: 'chart', summary: 'Acompanhe posicoes de ativos e amortizacao de emprestimos.' },
-    { slug: 'seguranca', title: 'Seguranca', icon: 'shield', summary: '2FA, dispositivos confiaveis, codigos de recuperacao, auditoria.' },
-];
-const chapters = props.chapters?.length ? props.chapters : defaultChapters;
+const page = usePage();
+const { t } = useT();
+
+// Resolve the active chapter object from the slug. Falls back
+// to null when the controller sends an empty chapters array.
+const activeChapterObj = computed(() => {
+    if (!props.activeChapter) return null;
+    return props.chapters.find((c) => c.slug === props.activeChapter) || null;
+});
+
+const isAuthed = computed(() => Boolean(page.props.auth?.user));
+
+// Split `body` into paragraphs on double newlines (the lang
+// files store the body as a single string with `\n\n` between
+// paragraphs).
+const bodyParagraphs = computed(() => {
+    const body = activeChapterObj.value?.body;
+    if (!body) return [];
+    return body.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+});
+
+// Map the active chapter slug to its demo component.
+const demoComponent = computed(() => {
+    const slug = props.activeChapter;
+    if (!slug) return null;
+    return {
+        'contas-e-categorias': DemoContasCategorias,
+        'transacoes': DemoTransacoes,
+        'metas-e-orcamentos': DemoMetasOrcamentos,
+        'pix-e-transferencias': DemoPixTransferencias,
+        'investimentos-e-dividas': DemoInvestimentosDividas,
+        'seguranca': DemoSeguranca,
+    }[slug] || null;
+});
+
+// Hero copy from useT() (so the public page can be re-rendered
+// in any locale without re-bundling). Falls back to the
+// controller-supplied hardcoded pt-BR string for safety.
+const heroTitle = computed(() => t('app.tutorial') || 'Tutorial interativo');
+const heroLede = computed(() => {
+    // No dedicated key in app.php for the lede — keep the
+    // hardcoded copy for now (the tutorial is pt-BR-first).
+    return 'Seis capitulos. Cada um com uma demo viva pra voce experimentar antes de mexer no seu dinheiro de verdade.';
+});
 </script>
 
 <template>
-    <Head title="Tutorial - Solar Money" />
+    <Head :title="activeChapterObj ? `${activeChapterObj.title} - Solar Money` : `Tutorial - Solar Money`" />
     <PublicLayout>
         <article class="tutorial">
-            <header class="tutorial__hero">
-                <h1 class="tutorial__title">Tutorial interativo</h1>
-                <p class="tutorial__lede">
-                    Seis capitulos. Cada um com uma demo viva pra voce
-                    experimentar antes de mexer no seu dinheiro de verdade.
-                </p>
-            </header>
+            <!-- INDEX VIEW (no active chapter) -->
+            <template v-if="!activeChapterObj">
+                <header class="tutorial__hero">
+                    <h1 class="tutorial__title">{{ heroTitle }}</h1>
+                    <p class="tutorial__lede">{{ heroLede }}</p>
+                </header>
 
-            <div class="tutorial__grid">
-                <Link
-                    v-for="ch in chapters"
-                    :key="ch.slug"
-                    :href="route('tutorial.chapter', { chapter: ch.slug })"
-                    class="tutorial__card"
-                >
-                    <div class="tutorial__icon" aria-hidden="true">
-                        <svg v-if="ch.icon === 'wallet'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="M16 13h2"/></svg>
-                        <svg v-else-if="ch.icon === 'arrows'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 7h10M14 4l3 3-3 3M17 17H7m3 3-3-3 3-3"/></svg>
-                        <svg v-else-if="ch.icon === 'target'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
-                        <svg v-else-if="ch.icon === 'flash'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
-                        <svg v-else-if="ch.icon === 'chart'" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/></svg>
-                        <svg v-else viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l8 4v6c0 5-4 9-8 10-4-1-8-5-8-10V6l8-4z"/></svg>
-                    </div>
-                    <h2 class="tutorial__card-title">{{ ch.title }}</h2>
-                    <p class="tutorial__card-summary">{{ ch.summary }}</p>
-                    <span class="tutorial__card-cta">Experimentar &rarr;</span>
+                <div class="tutorial__grid">
+                    <Link
+                        v-for="ch in chapters"
+                        :key="ch.slug"
+                        :href="route('tutorial.chapter', { chapter: ch.slug })"
+                        class="tutorial__card"
+                    >
+                        <div class="tutorial__icon" aria-hidden="true">
+                            <span class="tutorial__emoji">{{ ch.icon || '📘' }}</span>
+                        </div>
+                        <h2 class="tutorial__card-title">{{ ch.title }}</h2>
+                        <p class="tutorial__card-summary">{{ ch.subtitle }}</p>
+                        <span class="tutorial__card-cta">Experimentar &rarr;</span>
+                    </Link>
+                </div>
+            </template>
+
+            <!-- CHAPTER DETAIL VIEW -->
+            <template v-else>
+                <Link :href="route('tutorial')" class="tutorial__back">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    {{ t('app.back') }}
                 </Link>
-            </div>
+
+                <header class="tutorial__hero">
+                    <div class="tutorial__chapter-emoji" aria-hidden="true">{{ activeChapterObj.icon }}</div>
+                    <h1 class="tutorial__title tutorial__title--chapter">{{ activeChapterObj.title }}</h1>
+                    <p v-if="activeChapterObj.subtitle" class="tutorial__lede">{{ activeChapterObj.subtitle }}</p>
+                </header>
+
+                <section class="tutorial__body">
+                    <p v-for="(p, i) in bodyParagraphs" :key="i" class="tutorial__paragraph">{{ p }}</p>
+                </section>
+
+                <section v-if="demoComponent" class="tutorial__demo">
+                    <component :is="demoComponent" />
+                </section>
+
+                <footer class="tutorial__footer">
+                    <component
+                        :is="isAuthed ? Link : 'a'"
+                        :href="isAuthed ? route('dashboard') : route('login')"
+                        class="tutorial__cta"
+                    >
+                        <span v-if="isAuthed">Abrir o Solar &rarr;</span>
+                        <span v-else>{{ t('app.login') }} e abrir &rarr;</span>
+                    </component>
+                </footer>
+            </template>
         </article>
     </PublicLayout>
 </template>
@@ -70,12 +153,30 @@ const chapters = props.chapters?.length ? props.chapters : defaultChapters;
     background-clip: text;
     color: transparent;
 }
+.tutorial__title--chapter {
+    background: linear-gradient(120deg, #fbbf24 0%, #f59e0b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
 .tutorial__lede {
     font-size: 1.125rem;
     color: rgba(255, 255, 255, 0.78);
     margin: 0;
     line-height: 1.6;
 }
+.tutorial__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+    transition: color 120ms ease-out;
+}
+.tutorial__back:hover { color: #f59e0b; }
+
 .tutorial__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
@@ -101,6 +202,8 @@ const chapters = props.chapters?.length ? props.chapters : defaultChapters;
 .tutorial__icon {
     color: #f59e0b;
     margin-bottom: 0.75rem;
+    font-size: 2rem;
+    line-height: 1;
 }
 .tutorial__card-title {
     font-size: 1.125rem;
@@ -118,8 +221,52 @@ const chapters = props.chapters?.length ? props.chapters : defaultChapters;
     color: #f59e0b;
     font-weight: 500;
 }
+
+/* Chapter detail */
+.tutorial__chapter-emoji {
+    font-size: 2.5rem;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+.tutorial__body {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.tutorial__paragraph {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin: 0 0 1rem;
+}
+.tutorial__paragraph:last-child { margin-bottom: 0; }
+.tutorial__demo {
+    margin-bottom: 1.5rem;
+}
+.tutorial__footer {
+    margin-top: 2rem;
+    text-align: right;
+}
+.tutorial__cta {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    background: #f59e0b;
+    color: #0b0f1a;
+    font-weight: 600;
+    text-decoration: none;
+    transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tutorial__cta:hover { transform: translateY(-1px); }
+
 html[data-motion="reduced"] .tutorial__card,
-html[data-motion="reduced"] .tutorial__card:hover {
+html[data-motion="reduced"] .tutorial__card:hover,
+html[data-motion="reduced"] .tutorial__cta {
     transition: none !important;
     transform: none !important;
 }
