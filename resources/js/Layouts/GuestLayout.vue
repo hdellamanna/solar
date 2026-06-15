@@ -2,10 +2,13 @@
 import AppFooter from '@/Components/AppFooter.vue';
 
 import { Link } from '@inertiajs/vue3';
+import { useT } from '@/Composables/useT';
 
 defineProps({
     title: { type: String, default: null },
 });
+
+const { t } = useT();
 </script>
 
 <template>
@@ -58,8 +61,8 @@ defineProps({
                         <div class="sun-lens"></div>
                     </div>
                     <div>
-                        <div class="text-xl font-display font-bold tracking-tight text-gradient-aurora">Solar Money</div>
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-white/50">Suas finanças, com luz própria</div>
+                        <div class="text-xl font-display font-bold tracking-tight text-gradient-aurora">{{ t('app.brand') }}</div>
+                        <div class="text-[11px] uppercase tracking-[0.18em] text-white/50">{{ t('app.tagline') }}</div>
                     </div>
                 </Link>
 
@@ -122,7 +125,7 @@ defineProps({
                         </g>
                     </svg>
                 </div>
-                <span class="text-lg font-display font-bold">Solar Money</span>
+                <span class="text-lg font-display font-bold">{{ t('app.brand') }}</span>
             </Link>
 
             <div class="w-full max-w-sm">

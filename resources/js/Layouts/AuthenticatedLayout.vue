@@ -5,6 +5,7 @@ import { useTheme } from '@/Composables/useTheme';
 import { useShortcuts } from '@/Composables/useShortcuts';
 import { useGlobalSearch } from '@/Composables/useGlobalSearch';
 import { initials, formatCents, formatDate } from '@/Composables/useFormat';
+import { useT } from '@/Composables/useT';
 import AppFooter from '@/Components/AppFooter.vue';
 
 const props = defineProps({
@@ -14,6 +15,7 @@ const props = defineProps({
 const page = usePage();
 const user = computed(() => page.props.auth?.user);
 const { isDark, init: initTheme, toggle: toggleTheme } = useTheme();
+const { t } = useT();
 const sidebarOpen = ref(false);
 const userMenuOpen = ref(false);
 
@@ -247,9 +249,15 @@ const totalResults = () => {
                     enter-active-class="transition duration-150" enter-from-class="opacity-0 -translate-y-1" enter-to-class="opacity-100 translate-y-0"
                     leave-active-class="transition duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
                     <div v-if="userMenuOpen" class="mt-1.5 card p-1 text-sm">
-                        <Link :href="route('profile.edit')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">Perfil</Link>
-                        <Link :href="route('settings.index')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">Configurações</Link>
-                        <button @click="logout" class="block w-full text-left px-3 py-2 rounded-lg text-expense hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">Sair</button>
+                        <Link :href="route('profile.edit')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">{{ t('app.profile') }}</Link>
+                        <Link :href="route('settings.index')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">{{ t('app.settings') }}</Link>
+                        <Link :href="route('settings.idioma.show')" class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">
+                            <span>{{ t('app.language') }}</span>
+                            <span class="text-[10px] uppercase tracking-wider text-ink-400 font-mono">
+                                {{ page.props.app?.locale || 'pt-BR' }}
+                            </span>
+                        </Link>
+                        <button @click="logout" class="block w-full text-left px-3 py-2 rounded-lg text-expense hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">{{ t('app.logout') }}</button>
                     </div>
                 </Transition>
             </div>
