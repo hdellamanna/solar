@@ -78,11 +78,27 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    'locale' => env('APP_LOCALE', 'pt-BR'),
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Available Locales (FASE 7 — i18n tri-língue)
+    |--------------------------------------------------------------------------
+    |
+    | The set of locales the application supports. Used by the
+    | `SetLocale` middleware to validate any incoming locale candidate
+    | (from the authenticated user, the `X-App-Locale` header, or the
+    | `app_locale` cookie) and by the Settings/Idioma controller to
+    | validate a submitted locale choice. Anything outside this set
+    | silently falls back to `locale` (pt-BR).
+    |
+    */
+
+    'available_locales' => ['pt-BR', 'es', 'en'],
 
     /*
     |--------------------------------------------------------------------------
