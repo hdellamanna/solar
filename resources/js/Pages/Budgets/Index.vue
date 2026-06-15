@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents } from '@/Composables/useFormat';
 import { statusLabel, statusBadgeClass, colorBarClass } from '@/Composables/useBudget';
+import LocalizedName from '@/Components/LocalizedName.vue';
 
 const props = defineProps({
     budgets: { type: Array, default: () => [] },
@@ -73,7 +74,11 @@ const destroy = (b) => {
                         </span>
                         <div class="min-w-0">
                             <p class="font-semibold truncate">{{ b.name }}</p>
-                            <p class="text-xs text-slate-500 truncate">{{ b.category?.name }} • {{ b.period_label }}</p>
+                            <p class="text-xs text-slate-500 truncate">
+                                <span v-if="b.category"><LocalizedName :entity="b.category" /></span>
+                                <span v-else>—</span>
+                                • {{ b.period_label }}
+                            </p>
                         </div>
                     </div>
                     <span :class="['text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full', statusBadgeClass(b.status)]">

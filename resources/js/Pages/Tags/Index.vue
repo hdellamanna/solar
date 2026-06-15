@@ -3,6 +3,9 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { ref, computed } from 'vue';
 import { useTag } from '@/Composables/useTag';
+import { useT } from '@/Composables/useT';
+import { useLocale } from '@/Composables/useLocale';
+import { localizedNameOf } from '@/Composables/useLocalizedName';
 import { formatCents } from '@/Composables/useFormat';
 
 const props = defineProps({
@@ -10,11 +13,20 @@ const props = defineProps({
 });
 
 const { tagColor, tagIcon, readableTextOn } = useTag();
+const { t } = useT();
+const { locale: activeLocale } = useLocale();
 const editingId = ref(null);
 const showForm = ref(false);
 
+// FASE 7: the form has 3 name inputs (one per locale). The
+// `name` legacy shortcut is still wired for backward compat
+// with the backend's StoreTagRequest — submitting only `name`
+// will be normalized to `name_pt` server-side.
 const form = useForm({
     name: '',
+    name_pt: '',
+    name_es: '',
+    name_en: '',
     color: '#3b82f6',
     icon: '🏷️',
 });
@@ -31,7 +43,10 @@ const startCreate = () => {
 
 const startEdit = (tag) => {
     editingId.value = tag.id;
-    form.name = tag.name;
+    form.name = tag.name || '';
+    form.name_pt = tag.name_pt || '';
+    form.name_es = tag.name_es || '';
+    form.name_en = tag.name_en || '';
     form.color = tag.color || '#6b7280';
     form.icon = tag.icon || '🏷️';
     showForm.value = true;
@@ -57,12 +72,26 @@ const submit = () => {
 };
 
 const destroy = (tag) => {
-    if (confirm(`Excluir a tag "${tag.name}"?`)) {
+    if (confirm(t('app.delete') + '?')) {
         router.delete(route('tags.destroy', tag.id));
     }
 };
 
 const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
+
+// "Display name" in the active locale, used on the card title.
+// The other 2 locales are rendered as a small subtitle.
+const displayName = (tag) => localizedNameOf(tag, activeLocale.value);
+const otherLocaleNames = (tag) => {
+    const current = (activeLocale.value || 'pt-BR').split('-')[0]; // 'pt', 'es', 'en'
+    const labels = [];
+    for (const code of ['pt', 'es', 'en']) {
+        if (code === current) continue;
+        const value = tag[`name_${code}`];
+        if (value) labels.push({ code, value });
+    }
+    return labels;
+};
 </script>
 
 <template>
@@ -71,17 +100,28 @@ const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
             <p class="text-sm text-slate-500">{{ props.tags.length }} tag(s) cadastrada(s)</p>
             <button v-if="!showForm" @click="startCreate" class="btn-primary">+ Nova tag</button>
-            <button v-else @click="cancelForm" class="btn-ghost">Cancelar</button>
+            <button v-else @click="cancelForm" class="btn-ghost">{{ t('app.cancel') }}</button>
         </div>
 
         <!-- Create / Edit form -->
         <div v-if="showForm" class="card p-5 md:p-6 mb-4 max-w-xl">
-            <h2 class="font-semibold mb-3">{{ isEditing ? 'Editar tag' : 'Nova tag' }}</h2>
+            <h2 class="font-semibold mb-3">{{ isEditing ? t('app.edit') : t('app.tags') }}</h2>
             <form @submit.prevent="submit" class="space-y-3">
+                <!-- FASE 7: 3 name inputs, one per locale -->
                 <div>
-                    <label class="block text-sm font-medium mb-1">Nome</label>
-                    <input v-model="form.name" type="text" maxlength="60" placeholder="Ex: Trabalho, Pessoal..." class="input" required>
+                    <label class="block text-sm font-medium mb-1">Nome (pt-BR)</label>
+                    <input v-model="form.name_pt" type="text" maxlength="60" placeholder="Ex: Trabalho, Pessoal..." class="input">
                 </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nombre (es)</label>
+                    <input v-model="form.name_es" type="text" maxlength="60" placeholder="Trabajo, Personal..." class="input">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Name (en)</label>
+                    <input v-model="form.name_en" type="text" maxlength="60" placeholder="Work, Personal..." class="input">
+                </div>
+                <p class="text-xs text-slate-500">Preencha pelo menos um dos tres campos acima (validado pelo backend).</p>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-sm font-medium mb-1">Cor</label>
@@ -100,10 +140,10 @@ const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="submit" class="btn-primary" :disabled="form.processing">
-                        <span v-if="form.processing">Salvando...</span>
-                        <span v-else>{{ isEditing ? 'Atualizar' : 'Criar' }}</span>
+                        <span v-if="form.processing">{{ t('app.saving') }}</span>
+                        <span v-else>{{ t('app.save') }}</span>
                     </button>
-                    <button type="button" @click="cancelForm" class="btn-ghost">Cancelar</button>
+                    <button type="button" @click="cancelForm" class="btn-ghost">{{ t('app.cancel') }}</button>
                 </div>
             </form>
         </div>
@@ -128,7 +168,13 @@ const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
                             :style="{ backgroundColor: tagColor(tag.color), color: readableTextOn(tag.color) }"
                         >{{ tagIcon(tag.icon) }}</span>
                         <div class="min-w-0">
-                            <p class="font-semibold truncate">{{ tag.name }}</p>
+                            <p class="font-semibold truncate" :title="tag.name_pt || tag.name">{{ displayName(tag) }}</p>
+                            <p v-if="otherLocaleNames(tag).length" class="text-[11px] text-slate-400 truncate">
+                                <span v-for="o in otherLocaleNames(tag)" :key="o.code" class="mr-1.5">
+                                    <span class="font-mono text-[10px] uppercase text-slate-500">{{ o.code }}</span>
+                                    {{ o.value }}
+                                </span>
+                            </p>
                             <p class="text-xs text-slate-500">#{{ tag.slug }}</p>
                         </div>
                     </div>
@@ -150,11 +196,11 @@ const totalFor = (tag) => formatCents(Math.abs(tag.total_cents || 0));
                 <div class="flex items-center gap-2 mt-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <button @click="startEdit(tag)" class="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 inline-flex items-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        Editar
+                        {{ t('app.edit') }}
                     </button>
                     <button @click="destroy(tag)" class="text-xs text-slate-500 hover:text-expense inline-flex items-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        Excluir
+                        {{ t('app.delete') }}
                     </button>
                 </div>
             </div>
