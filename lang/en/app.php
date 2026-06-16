@@ -27,6 +27,7 @@ return [
     'register' => 'Create account',
     'dashboard' => 'Dashboard',
     'accounts' => 'Accounts',
+    'about' => 'About',
     'transactions' => 'Transactions',
     'subscriptions' => 'Subscriptions',
     'goals' => 'Goals',

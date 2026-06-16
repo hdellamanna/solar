@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import LocalizedName from '@/Components/LocalizedName.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -137,7 +138,7 @@ const typeBadge = (type) => {
                         </div>
                         <h3 class="font-semibold mt-1.5 truncate">{{ r.description }}</h3>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ r.account?.name || '—' }}<span v-if="r.category"> · {{ r.category.icon }} {{ r.category.name }}</span>
+                            {{ r.account?.name || '—' }}<span v-if="r.category"> · {{ r.category.icon }} <LocalizedName :entity="r.category" /></span>
                         </p>
                     </div>
                     <p :class="['text-lg font-bold whitespace-nowrap', r.type === 'income' ? 'text-income' : 'text-expense']">

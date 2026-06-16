@@ -3,6 +3,10 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { ref, computed } from 'vue';
 import { formatCents, formatDate } from '@/Composables/useFormat';
+import { useFormatType } from '@/Composables/useFormatType';
+import LocalizedName from '@/Components/LocalizedName.vue';
+
+const formatType = useFormatType('transaction');
 
 const props = defineProps({
     transaction: { type: Object, required: true },
@@ -66,7 +70,7 @@ function destroy() {
                             <span>{{ formatDate(tx.date) }}</span>
                             <span class="px-1.5 py-0.5 rounded text-xs uppercase font-semibold"
                                 :class="isExpense ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'">
-                                {{ tx.type === 'income' ? 'Receita' : tx.type === 'expense' ? 'Despesa' : 'Transferencia' }}
+                                {{ formatType(tx.type) }}
                             </span>
                             <span v-if="tx.is_pix" class="px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">PIX</span>
                             <span v-if="hasSplits" class="px-1.5 py-0.5 rounded text-xs bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">Dividida</span>
@@ -118,8 +122,8 @@ function destroy() {
                         <div class="flex-1 min-w-0">
                             <p class="font-medium truncate">{{ split.user?.name || 'Usuario #' + split.user_id }}</p>
                             <p class="text-xs text-slate-500">
-                                <span v-if="split.category">{{ split.category.icon }} {{ split.category.name }}</span>
-                                <span v-else-if="tx.category">{{ tx.category.icon }} {{ tx.category.name }}</span>
+                                <span v-if="split.category">{{ split.category.icon }} <LocalizedName :entity="split.category" /></span>
+                                <span v-else-if="tx.category">{{ tx.category.icon }} <LocalizedName :entity="tx.category" /></span>
                                 <span v-else>Sem categoria</span>
                                 <span v-if="split.description"> · {{ split.description }}</span>
                             </p>

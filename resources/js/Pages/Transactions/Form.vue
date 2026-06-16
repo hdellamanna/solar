@@ -3,6 +3,8 @@ import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SplitEditor from '@/Components/SplitEditor.vue';
 import { useAiCategorize } from '@/Composables/useAiCategorize';
+import { useFormatType } from '@/Composables/useFormatType';
+import { localizedNameOf } from '@/Composables/useLocalizedName';
 import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
@@ -13,6 +15,7 @@ const props = defineProps({
 });
 
 const ai = useAiCategorize();
+const formatType = useFormatType('transaction');
 const aiToast = ref(null);
 let aiToastTimer = null;
 
@@ -145,17 +148,17 @@ function scheduleToastClear() {
                         <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'expense' ? 'border-expense bg-red-50 dark:bg-red-900/20' : 'border-slate-200 dark:border-slate-700']">
                             <input v-model="form.type" type="radio" value="expense" class="sr-only">
                             <span class="text-2xl">⬇️</span>
-                            <p class="text-sm font-medium mt-1">Despesa</p>
+                            <p class="text-sm font-medium mt-1">{{ formatType('expense') }}</p>
                         </label>
                         <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'income' ? 'border-income bg-green-50 dark:bg-green-900/20' : 'border-slate-200 dark:border-slate-700']">
                             <input v-model="form.type" type="radio" value="income" class="sr-only">
                             <span class="text-2xl">⬆️</span>
-                            <p class="text-sm font-medium mt-1">Receita</p>
+                            <p class="text-sm font-medium mt-1">{{ formatType('income') }}</p>
                         </label>
                         <label :class="['cursor-pointer border-2 rounded-xl p-3 text-center transition-colors', form.type === 'transfer' ? 'border-info bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700']">
                             <input v-model="form.type" type="radio" value="transfer" class="sr-only">
                             <span class="text-2xl">↔️</span>
-                            <p class="text-sm font-medium mt-1">Transf.</p>
+                            <p class="text-sm font-medium mt-1">{{ formatType('transfer') }}</p>
                         </label>
                     </div>
                 </div>
@@ -203,7 +206,7 @@ function scheduleToastClear() {
                     <div class="flex items-center gap-2">
                         <select v-model="form.category_id" class="input flex-1">
                             <option value="">Sem categoria</option>
-                            <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ c.name }}</option>
+                            <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ localizedNameOf(c, $page.props.app?.locale || 'pt-BR') }}</option>
                         </select>
                         <button
                             v-if="showAiSuggest"

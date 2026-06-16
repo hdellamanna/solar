@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents, formatDate } from '@/Composables/useFormat';
 import { useTransactionFilters } from '@/Composables/useTransactionFilters';
+import LocalizedName from '@/Components/LocalizedName.vue';
 import { ref, computed } from 'vue';
 
 const props = defineProps({
@@ -132,7 +133,7 @@ const destroy = (tx) => {
                     <div v-if="categoryMenuOpen" class="absolute z-20 mt-1 w-full card p-2 max-h-60 overflow-y-auto">
                         <button type="button" v-for="c in props.categories" :key="c.id" @click="toggleCategory(c.id)" class="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
                             <input type="checkbox" :checked="state.category_ids.includes(c.id)" class="rounded">
-                            <span class="truncate">{{ c.icon }} {{ c.name }}</span>
+                            <span class="truncate">{{ c.icon }} <LocalizedName :entity="c" /></span>
                         </button>
                         <div v-if="!props.categories.length" class="text-xs text-slate-500 px-2 py-1">Nenhuma categoria.</div>
                         <div class="border-t border-slate-100 dark:border-slate-800 mt-1 pt-1 flex gap-2">
@@ -182,7 +183,7 @@ const destroy = (tx) => {
                                 <span v-if="tx.splits_count" class="ml-1 text-xs px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">Dividida</span>
                             </td>
                             <td class="px-4 py-3 hidden md:table-cell text-slate-500">
-                                <span v-if="tx.category">{{ tx.category.icon }} {{ tx.category.name }}</span>
+                                <span v-if="tx.category">{{ tx.category.icon }} <LocalizedName :entity="tx.category" /></span>
                                 <span v-else class="text-slate-300">—</span>
                             </td>
                             <td class="px-4 py-3 hidden md:table-cell text-slate-500">{{ tx.account?.name }}</td>

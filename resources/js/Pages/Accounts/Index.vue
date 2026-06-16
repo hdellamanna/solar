@@ -2,6 +2,7 @@
 import { Head, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents } from '@/Composables/useFormat';
+import { useFormatType } from '@/Composables/useFormatType';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -9,13 +10,19 @@ const props = defineProps({
     types: { type: Object, default: () => ({}) },
 });
 
+const formatAccountType = useFormatType('account');
+
 const destroy = (acc) => {
     if (confirm(`Excluir conta "${acc.name}"?`)) {
         router.delete(route('accounts.destroy', acc.id));
     }
 };
 
-const typeLabel = (t) => props.types[t] || t;
+// Prefer the localized lookup from `useFormatType` (which reads
+// the active locale), but fall back to the `props.types` map
+// the controller already sends for backward compat — and finally
+// to the raw code so the page never breaks.
+const typeLabel = (t) => formatAccountType(t) || props.types[t] || t;
 </script>
 
 <template>

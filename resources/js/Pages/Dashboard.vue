@@ -4,6 +4,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { formatCents, formatDate } from '@/Composables/useFormat';
 import { useLineConfig, useDarkMode } from '@/Composables/useChart';
 import PwaInstallBanner from '@/Components/PwaInstallBanner.vue';
+import LocalizedName from '@/Components/LocalizedName.vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -380,7 +381,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium truncate">{{ tx.description }}</p>
                             <p class="text-[11px] text-ink-500 truncate mt-0.5">
-                                {{ tx.account?.name }} · {{ tx.category?.name }} · {{ formatDate(tx.date) }}
+                                {{ tx.account?.name }} · <span v-if="tx.category"><LocalizedName :entity="tx.category" /></span> · {{ formatDate(tx.date) }}
                             </p>
                         </div>
                         <span class="text-sm font-bold tabular-nums num"
