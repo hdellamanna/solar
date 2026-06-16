@@ -7,19 +7,32 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Tutorial page (FASE 4D).
+ * Tutorial page (FASE 4D + FASE 7 — i18n tri-língue).
  *
  * Public page with 6 interactive chapters. No auth required.
+ *
+ * FASE 7 — the chapter copy (`title`, `subtitle`, `body`) is now
+ * looked up from `lang/{current_locale}/tutorial.php` so the
+ * front-end can stay dumb (no `__()` calls in Vue — the backend
+ * already shipped the right strings). The list of slugs and icons
+ * is the same in every locale so the in-page navigation does not
+ * need to be re-rendered.
  */
 class TutorialController extends Controller
 {
-    private const CHAPTER_SLUGS = [
-        'contas-e-categorias',
-        'transacoes',
-        'metas-e-orcamentos',
-        'pix-e-transferencias',
-        'investimentos-e-dividas',
-        'seguranca',
+    /**
+     * Slugs for the 6 chapters, in display order. The slug
+     * is the URL identifier (`/tutorial/contas-e-categorias`) and
+     * is locale-independent. The localized copy lives in
+     * `lang/{locale}/tutorial.php` keyed by chapter number.
+     */
+    private const CHAPTERS = [
+        1 => ['slug' => 'contas-e-categorias',       'icon' => '🏦'],
+        2 => ['slug' => 'transacoes',                 'icon' => '💸'],
+        3 => ['slug' => 'metas-e-orcamentos',         'icon' => '🎯'],
+        4 => ['slug' => 'pix-e-transferencias',       'icon' => '⚡'],
+        5 => ['slug' => 'investimentos-e-dividas',    'icon' => '📈'],
+        6 => ['slug' => 'seguranca',                  'icon' => '🔐'],
     ];
 
     /**
@@ -28,7 +41,7 @@ class TutorialController extends Controller
     public function __invoke(): Response
     {
         return Inertia::render('Tutorial', [
-            'chapters' => $this->chapters(),
+            'chapters' => $this->buildChapterList(),
             'activeChapter' => null,
         ]);
     }
@@ -40,52 +53,76 @@ class TutorialController extends Controller
     {
         $slug = $request->route('chapter');
 
-        abort_unless(in_array($slug, self::CHAPTER_SLUGS, true), 404);
+        abort_unless($this->slugExists($slug), 404);
 
         return Inertia::render('Tutorial', [
-            'chapters' => $this->chapters(),
+            'chapters' => $this->buildChapterList(),
             'activeChapter' => $slug,
         ]);
     }
 
     /**
-     * Static definition of the 6 tutorial chapters.
+     * Read the chapter copy from the active locale's tutorial lang
+     * file and merge it with the locale-independent metadata
+     * (slug + icon). Returns an array of 6 entries with `slug`,
+     * `title`, `subtitle`, `body`, `icon`.
      *
-     * @return array<int, array{slug: string, title: string, icon: string}>
+     * @return array<int, array{slug: string, title: string, subtitle: string, body: string, icon: string}>
      */
-    private function chapters(): array
+    private function buildChapterList(): array
     {
-        return [
-            [
-                'slug'  => 'contas-e-categorias',
-                'title' => 'Contas e categorias',
-                'icon'  => '🏦',
-            ],
-            [
-                'slug'  => 'transacoes',
-                'title' => 'Transações',
-                'icon'  => '💸',
-            ],
-            [
-                'slug'  => 'metas-e-orcamentos',
-                'title' => 'Metas e orçamentos',
-                'icon'  => '🎯',
-            ],
-            [
-                'slug'  => 'pix-e-transferencias',
-                'title' => 'PIX e transferências',
-                'icon'  => '⚡',
-            ],
-            [
-                'slug'  => 'investimentos-e-dividas',
-                'title' => 'Investimentos e dívidas',
-                'icon'  => '📈',
-            ],
-            [
-                'slug'  => 'seguranca',
-                'title' => 'Segurança',
-                'icon'  => '🔐',
-            ],
-        ];
+        $locale = (string) app()->getLocale();
+        $copy = $this->loadChapterCopy($locale);
+
+        $out = [];
+        foreach (self::CHAPTERS as $n => $meta) {
+            $entry = $copy[$n] ?? [];
+            $out[] = [
+                'slug'    => $meta['slug'],
+                'icon'    => $meta['icon'],
+                'title'    => $entry['title'] ?? ucfirst(str_replace('-', ' ', $meta['slug'])),
+                'subtitle' => $entry['subtitle'] ?? '',
+                'body'     => $entry['body'] ?? '',
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Pull the chapter copy from the active locale's lang file.
+     * Falls back to the app's default locale when the active
+     * locale has no tutorial file (e.g. during the first request
+     * after a fresh install with `APP_LOCALE=pt-BR` but a user
+     * session that picked an unsupported locale).
+     *
+     * @return array<int, array{title: string, subtitle: string, body: string, slug: string}>
+     */
+    private function loadChapterCopy(string $locale): array
+    {
+        $path = $this->tutorialPath($locale);
+        if (! is_file($path)) {
+            $path = $this->tutorialPath((string) config('app.fallback_locale', 'en'));
+        }
+        if (! is_file($path)) {
+            return [];
+        }
+        $arr = require $path;
+        return is_array($arr) ? ($arr['chapter'] ?? []) : [];
+    }
+
+    private function tutorialPath(string $locale): string
+    {
+        return lang_path(str_replace('-', '_', $locale) . '/tutorial.php');
+    }
+
+    private function slugExists(string $slug): bool
+    {
+        foreach (self::CHAPTERS as $meta) {
+            if ($meta['slug'] === $slug) {
+                return true;
+            }
+        }
+        return false;
     }
 }

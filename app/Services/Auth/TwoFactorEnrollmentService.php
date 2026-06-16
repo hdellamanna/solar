@@ -74,7 +74,10 @@ class TwoFactorEnrollmentService
             ['token' => $minted['raw']],
         );
 
-        Mail::to($user->email)->send(new TwoFactorEnableMail($user, $url));
+        // FASE 7 — i18n: pin the Mailable to the recipient's locale.
+        Mail::to($user->email)
+            ->locale($user->locale ?? config('app.locale'))
+            ->send(new TwoFactorEnableMail($user, $url));
 
         return $minted['raw'];
     }
@@ -184,7 +187,10 @@ class TwoFactorEnrollmentService
             ['token' => $minted['raw']],
         );
 
-        Mail::to($user->email)->send(new TwoFactorDisableMail($user, $url));
+        // FASE 7 — i18n: pin the Mailable to the recipient's locale.
+        Mail::to($user->email)
+            ->locale($user->locale ?? config('app.locale'))
+            ->send(new TwoFactorDisableMail($user, $url));
 
         return $minted['raw'];
     }

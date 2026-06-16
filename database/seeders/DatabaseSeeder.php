@@ -23,6 +23,12 @@ use Illuminate\Support\Facades\Hash;
 /**
  * Populates the database with one demo user, 5 accounts, 15 default categories,
  * and ~6 months of realistic Brazilian transactions.
+ *
+ * FASE 7 — i18n tri-língue. Every seeded Category and Tag now
+ * carries the 3 localized names (`name_pt`, `name_es`, `name_en`).
+ * The seeder also creates 2 additional demo users in the Spanish
+ * and English locales so the FASE 7 verification track can hit the
+ * app in any of the 3 supported languages.
  */
 class DatabaseSeeder extends Seeder
 {
@@ -37,6 +43,38 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Henrique Demo',
                 'password' => Hash::make('solar123'),
                 'theme' => 'light',
+                // FASE 7 — i18n tri-língue. The Brazilian demo
+                // user is the default-locale user.
+                'locale' => 'pt-BR',
+                'home_currency' => 'BRL',
+                'email_verified_at' => now(),
+            ]
+        );
+
+        // FASE 7 — Spanish and English demo users. Same password
+        // (solar123) so the verification track can hop between
+        // accounts without re-issuing credentials. Each gets its
+        // own copy of the seed data via the same seedXxx methods
+        // so the three users have parallel experience in their
+        // own locale.
+        $esUser = User::firstOrCreate(
+            ['email' => 'demo@es.solar.app'],
+            [
+                'name' => 'Demo ES',
+                'password' => Hash::make('solar123'),
+                'theme' => 'light',
+                'locale' => 'es',
+                'home_currency' => 'BRL',
+                'email_verified_at' => now(),
+            ]
+        );
+        $enUser = User::firstOrCreate(
+            ['email' => 'demo@en.solar.app'],
+            [
+                'name' => 'Demo EN',
+                'password' => Hash::make('solar123'),
+                'theme' => 'light',
+                'locale' => 'en',
                 'home_currency' => 'BRL',
                 'email_verified_at' => now(),
             ]
@@ -63,9 +101,14 @@ class DatabaseSeeder extends Seeder
             Tag::firstOrCreate(
                 ['user_id' => $user->id, 'slug' => $slug],
                 [
-                    'name'  => $data['name'],
-                    'color' => $data['color'],
-                    'icon'  => $data['icon'],
+                    // FASE 7 — i18n. `name` (legacy) + the 3
+                    // localized variants.
+                    'name'    => $data['name_pt'],
+                    'name_pt' => $data['name_pt'],
+                    'name_es' => $data['name_es'] ?? null,
+                    'name_en' => $data['name_en'] ?? null,
+                    'color'   => $data['color'],
+                    'icon'    => $data['icon'],
                 ]
             );
         }
@@ -73,29 +116,36 @@ class DatabaseSeeder extends Seeder
 
     private function seedCategories(): void
     {
+        // FASE 7 — i18n. Every default category now carries the
+        // 3 localized names. The Spanish + English values are
+        // literal translations of the pt-BR seed (or the closest
+        // natural equivalent for a personal-finance vocabulary).
         $defaults = [
             // Expense
-            ['name' => 'Alimentação', 'type' => 'expense', 'icon' => '🍔', 'color' => '#f59e0b'],
-            ['name' => 'Transporte', 'type' => 'expense', 'icon' => '🚗', 'color' => '#3b82f6'],
-            ['name' => 'Moradia', 'type' => 'expense', 'icon' => '🏠', 'color' => '#8b5cf6'],
-            ['name' => 'Saúde', 'type' => 'expense', 'icon' => '⚕️', 'color' => '#ef4444'],
-            ['name' => 'Educação', 'type' => 'expense', 'icon' => '📚', 'color' => '#06b6d4'],
-            ['name' => 'Lazer', 'type' => 'expense', 'icon' => '🎬', 'color' => '#ec4899'],
-            ['name' => 'Compras', 'type' => 'expense', 'icon' => '🛍️', 'color' => '#84cc16'],
-            ['name' => 'Serviços', 'type' => 'expense', 'icon' => '🔧', 'color' => '#64748b'],
-            ['name' => 'Assinaturas', 'type' => 'expense', 'icon' => '📺', 'color' => '#a855f7'],
-            ['name' => 'Outros', 'type' => 'expense', 'icon' => '📦', 'color' => '#94a3b8'],
+            ['name_pt' => 'Alimentação', 'name_es' => 'Alimentación', 'name_en' => 'Food', 'type' => 'expense', 'icon' => '🍔', 'color' => '#f59e0b'],
+            ['name_pt' => 'Transporte',  'name_es' => 'Transporte',   'name_en' => 'Transport', 'type' => 'expense', 'icon' => '🚗', 'color' => '#3b82f6'],
+            ['name_pt' => 'Moradia',     'name_es' => 'Vivienda',     'name_en' => 'Housing', 'type' => 'expense', 'icon' => '🏠', 'color' => '#8b5cf6'],
+            ['name_pt' => 'Saúde',       'name_es' => 'Salud',        'name_en' => 'Health', 'type' => 'expense', 'icon' => '⚕️', 'color' => '#ef4444'],
+            ['name_pt' => 'Educação',    'name_es' => 'Educación',    'name_en' => 'Education', 'type' => 'expense', 'icon' => '📚', 'color' => '#06b6d4'],
+            ['name_pt' => 'Lazer',       'name_es' => 'Ocio',         'name_en' => 'Entertainment', 'type' => 'expense', 'icon' => '🎬', 'color' => '#ec4899'],
+            ['name_pt' => 'Compras',     'name_es' => 'Compras',      'name_en' => 'Shopping', 'type' => 'expense', 'icon' => '🛍️', 'color' => '#84cc16'],
+            ['name_pt' => 'Serviços',    'name_es' => 'Servicios',    'name_en' => 'Services', 'type' => 'expense', 'icon' => '🔧', 'color' => '#64748b'],
+            ['name_pt' => 'Assinaturas', 'name_es' => 'Suscripciones', 'name_en' => 'Subscriptions', 'type' => 'expense', 'icon' => '📺', 'color' => '#a855f7'],
+            ['name_pt' => 'Outros',      'name_es' => 'Otros',        'name_en' => 'Other', 'type' => 'expense', 'icon' => '📦', 'color' => '#94a3b8'],
             // Income
-            ['name' => 'Salário', 'type' => 'income', 'icon' => '💼', 'color' => '#10b981'],
-            ['name' => 'Freelance', 'type' => 'income', 'icon' => '💻', 'color' => '#14b8a6'],
-            ['name' => 'Investimentos', 'type' => 'income', 'icon' => '📈', 'color' => '#22c55e'],
-            ['name' => 'Reembolso', 'type' => 'income', 'icon' => '↩️', 'color' => '#0ea5e9'],
-            ['name' => 'Outros (receita)', 'type' => 'income', 'icon' => '💰', 'color' => '#16a34a'],
+            ['name_pt' => 'Salário',         'name_es' => 'Salario',            'name_en' => 'Salary',         'type' => 'income', 'icon' => '💼', 'color' => '#10b981'],
+            ['name_pt' => 'Freelance',       'name_es' => 'Trabajo freelance',  'name_en' => 'Freelance',      'type' => 'income', 'icon' => '💻', 'color' => '#14b8a6'],
+            ['name_pt' => 'Investimentos',   'name_es' => 'Inversiones',        'name_en' => 'Investments',    'type' => 'income', 'icon' => '📈', 'color' => '#22c55e'],
+            ['name_pt' => 'Reembolso',       'name_es' => 'Reembolso',          'name_en' => 'Refund',         'type' => 'income', 'icon' => '↩️', 'color' => '#0ea5e9'],
+            ['name_pt' => 'Outros (receita)','name_es' => 'Otros (ingreso)',    'name_en' => 'Other (income)', 'type' => 'income', 'icon' => '💰', 'color' => '#16a34a'],
         ];
 
         foreach ($defaults as $cat) {
+            // FASE 7 — uniqueness is on the pt-BR name (the
+            // canonical id) and `user_id`. We still set the
+            // legacy `name` column for backward compat.
             Category::firstOrCreate(
-                ['name' => $cat['name'], 'user_id' => null],
+                ['name' => $cat['name_pt'], 'user_id' => null],
                 array_merge($cat, ['is_default' => true])
             );
         }

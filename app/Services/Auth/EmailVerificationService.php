@@ -69,7 +69,14 @@ class EmailVerificationService
             ['token' => $minted['raw']],
         );
 
-        Mail::to($user->email)->send(new VerifyEmailMail($user, $url));
+        // FASE 7 — i18n: pin the Mailable to the recipient's
+        // preferred locale so the localized subject + the
+        // `__()` lookups in the Blade view resolve to the right
+        // `lang/{locale}/mail.php` file. Falls back to the app
+        // default (pt-BR) when the user has not picked one yet.
+        Mail::to($user->email)
+            ->locale($user->locale ?? config('app.locale'))
+            ->send(new VerifyEmailMail($user, $url));
 
         $this->tokens->bumpResendCounterForUser($user);
     }

@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureEmailIsVerified;
 use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InjectRequestId;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -37,6 +38,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // middleware that might log.
         $middleware->web(prepend: [
             InjectRequestId::class,
+        ]);
+
+        // FASE 7 — i18n tri-língue. Resolve the active locale
+        // (user > X-App-Locale header > app_locale cookie >
+        // config default) and apply it via `app()->setLocale()`
+        // and `Carbon::setLocale()`. Prepended so it runs
+        // before `StartSession` and `HandleInertiaRequests`,
+        // guaranteeing the Inertia shared props and Carbon
+        // formatting both see the right locale on the first
+        // render of the page.
+        $middleware->web(prepend: [
+            SetLocale::class,
         ]);
 
         $middleware->web(append: [

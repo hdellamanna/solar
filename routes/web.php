@@ -24,6 +24,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurrenceController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Settings\AppearanceController;
+use App\Http\Controllers\Settings\LocaleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TagController;
@@ -240,6 +241,12 @@ Route::middleware('auth')->group(function () {
             ->name('settings.appearance.show');
         Route::patch('/settings/appearance', [AppearanceController::class, 'update'])
             ->name('settings.appearance.update');
+
+        // FASE 7 — language preference (i18n tri-língue)
+        Route::get('/settings/idioma', [LocaleController::class, 'show'])
+            ->name('settings.idioma.show');
+        Route::patch('/settings/idioma', [LocaleController::class, 'update'])
+            ->name('settings.idioma.update');
 
         // 2FA settings (Auth Phase 3).
         Route::post('/settings/security/two-factor/enable', [TwoFactorEnableController::class, 'beginEnable'])

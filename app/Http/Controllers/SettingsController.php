@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,10 +21,37 @@ class SettingsController extends Controller
      * light — each subsection owns its own controller for the
      * actions (enable, disable, revoke). This controller is just
      * the "where do I click?" landing page.
+     *
+     * FASE 7 — the index now also carries the `availableLocales`
+     * + `currentLocale` props so the "Idioma" card can show the
+     * active language and link to the picker.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        return Inertia::render('Settings/Index');
+        $user = $request->user();
+
+        return Inertia::render('Settings/Index', [
+            'currentLocale' => (string) ($user?->locale ?? app()->getLocale()),
+            'availableLocales' => $this->localeLabels(),
+        ]);
+    }
+
+    /**
+     * @return array<int, array{code: string, name: string, english_name: string}>
+     */
+    private function localeLabels(): array
+    {
+        $labels = [
+            'pt-BR' => ['name' => 'Português (Brasil)', 'english' => 'Portuguese (Brazil)'],
+            'es'    => ['name' => 'Español',           'english' => 'Spanish'],
+            'en'    => ['name' => 'English',            'english' => 'English'],
+        ];
+        $out = [];
+        foreach ((array) config('app.available_locales', ['pt-BR', 'es', 'en']) as $code) {
+            $label = $labels[$code] ?? ['name' => $code, 'english' => $code];
+            $out[] = ['code' => $code, 'name' => $label['name'], 'english_name' => $label['english']];
+        }
+        return $out;
     }
 
     /**

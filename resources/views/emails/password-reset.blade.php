@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Redefina sua senha - Solar Money</title>
+    <title>{{ __('mail.reset.subject') }}</title>
     <style>
         /* Resets */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 32px; }
@@ -51,17 +51,18 @@
 </head>
 <body>
     <div class="container">
-        <div class="logo">Solar Money</div>
-        <h1 class="headline">Redefina sua senha</h1>
+        <div class="logo">{{ __('mail.common.brand') }}</div>
+        <h1 class="headline">{{ __('mail.reset.greeting') }}</h1>
         <p class="body">
-            Olá {{ $user->name }}, clique no botão abaixo para redefinir sua senha. O link expira em 60 minutos.
+            {{ __('mail.reset.intro', ['name' => $user->name]) }}
+            {{ __('mail.reset.expire') }}
         </p>
         <p style="text-align: center; margin: 32px 0;">
-            <a href="{{ $resetUrl }}" class="btn">Redefinir senha</a>
+            <a href="{{ $resetUrl }}" class="btn">{{ __('mail.reset.action') }}</a>
         </p>
-        <p class="muted">Ou cole este link no navegador:</p>
+        <p class="muted">{{ __('mail.reset.fallback_url_label') }}</p>
         <p class="url">{{ $resetUrl }}</p>
-        <p class="muted">Se você não solicitou isso, ignore este email — sua senha não será alterada.</p>
+        <p class="muted">{{ __('mail.reset.footer') }}</p>
     </div>
 </body>
 </html>

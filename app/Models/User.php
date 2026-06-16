@@ -18,6 +18,11 @@ class User extends Authenticatable
         'email',
         'password',
         'theme',
+        // FASE 7 — i18n tri-língue. Per-user locale preference
+        // (one of `pt-BR`, `es`, `en`). Read by the
+        // `SetLocale` middleware on every request and persisted
+        // by `Settings/LocaleController`.
+        'locale',
         'home_currency',
         'use_ai_categorize',
         'motion_preference',
