@@ -1,0 +1,51 @@
+# Local dev + Render.com production ignores.
+#
+# Files NOT shipped to the container (smaller image, faster deploys).
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Local env (operator sets env vars in the Render dashboard)
+.env
+.env.*
+!.env.example
+
+# CI / agent tooling
+.mavis
+.sessions
+.storage
+
+# Editor / IDE
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Test artifacts
+.phpunit.cache
+.phpunit.result.cache
+tests
+phpunit.xml
+phpunit.xml.dist
+/coverage
+.clover.xml
+
+# Screenshots / dev docs not for production
+*.png
+deliverable.md
+LICENSE.md
+
+# Build cache (regenerated in the assets stage)
+node_modules
+public/build
+public/hot
+
+# Local-only scripts
+scripts

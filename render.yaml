@@ -1,0 +1,97 @@
+# Render Blueprint — Solar Money
+#
+# This file declares the full Render infrastructure as code.
+# Render reads this when you click "New > Blueprint" and points it at the repo.
+#
+# Two services:
+#   1. solar-money (web) — the Laravel app, Docker image built from ./Dockerfile
+#   2. solar-db (pserv) — the Postgres database
+#
+# To enable production-grade cron (recurrences, subscriptions billing),
+# add a third `type: cron` service in a future FASE.
+
+services:
+  - type: web
+    name: solar-money
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /up
+    autoDeploy: true
+    # Render passes the public URL on port 10000; nginx inside the
+    # container listens on that port.
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        fromService: { type: web, name: solar-money, property: hostUrl }
+      - key: APP_LOCALE
+        value: pt-BR
+      - key: APP_FALLBACK_LOCALE
+        value: en
+      - key: APP_FAKER_LOCALE
+        value: pt_BR
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_STACK
+        value: single,structured
+      - key: LOG_DEPRECATIONS_CHANNEL
+        value: null
+      - key: LOG_LEVEL
+        value: info
+      - key: LOG_REQUEST_HEADER
+        value: X-Request-Id
+      # Database — Render injects DATABASE_URL; we map it to DB_CONNECTION.
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromService: { type: pserv, name: solar-db, property: databaseConnectionString }
+      - key: DB_SSLMODE
+        value: require
+      # Cache / queue / session on database so we don't need Redis on the free tier.
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: SESSION_DRIVER
+        value: database
+      - key: SESSION_LIFETIME
+        value: 120
+      # Storage on the local disk (Render free tier has ephemeral disk,
+      # so user uploads are NOT persistent — the README explains this).
+      - key: FILESYSTEM_DISK
+        value: local
+      # Mail via Resend.
+      - key: MAIL_MAILER
+        value: resend
+      - key: MAIL_FROM_ADDRESS
+        value: noreply@solar.app
+      - key: MAIL_FROM_NAME
+        value: Solar Money
+      # Secrets the operator sets in the Render dashboard (sync: false).
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENTRY_LARAVEL_DSN
+        sync: false
+      # Trust Render's load balancer as a proxy.
+      - key: TRUSTED_PROXIES
+        value: '*'
+      # Disable dev-only tools in production.
+      - key: PULSE_ENABLED
+        value: false
+      - key: TELESCOPE_ENABLED
+        value: false
+      - key: NIGHTWATCH_ENABLED
+        value: false
+      - key: BROADCAST_CONNECTION
+        value: null
+
+  - type: pserv
+    name: solar-db
+    plan: free
+    ipAllowList: []  # only the web service in the same Render account can connect

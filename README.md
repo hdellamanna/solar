@@ -497,6 +497,104 @@ Project conventions:
 - **Branches** named `feat/fase-N-feature`, PR against `main`
 - **Don't merge your own PR** — wait for review
 
+## ☁️ Production deployment
+
+Solar ships with a Render.com Blueprint (`render.yaml`) and a production-grade Dockerfile. Deploy in **3 steps** to a public URL with HTTPS, Postgres, and zero server work.
+
+### 1. Fork this repo
+
+Click **Fork** at the top-right of this page. Render reads the Blueprint from your fork (or any branch you point it at), so the repo must live under your GitHub account.
+
+### 2. Sign up at [render.com](https://render.com) and create a Blueprint
+
+1. Go to **Dashboard → New → Blueprint**.
+2. Connect the repo you just forked.
+3. Render reads `render.yaml` and previews the infrastructure:
+   - **solar-money** — the Laravel web service (Docker, free tier)
+   - **solar-db** — the Postgres database (free tier, 1GB)
+4. Click **Apply**.
+
+Render creates both services in ~90 seconds and starts building the Docker image. The first build takes ~5-8 minutes (downloads PHP 8.4-FPM, npm ci 22 deps, composer install, npm run build).
+
+### 3. Set the 2 secrets + visit the URL
+
+In the Render dashboard for `solar-money`:
+
+1. Go to **Environment**.
+2. Set the two `sync: false` values:
+   - `RESEND_API_KEY` — your Resend API key from [resend.com/api-keys](https://resend.com/api-keys)
+   - `SENTRY_LARAVEL_DSN` — (optional) Sentry project DSN for error tracking
+3. Click **Save Changes** → Render redeploys with the secrets.
+4. Wait for the deploy to finish (status turns green).
+5. Open `https://solar-money.onrender.com` (your actual URL is in the dashboard).
+
+On first visit the container's entrypoint script automatically:
+
+- Waits for Postgres to be reachable
+- Runs `php artisan migrate --force`
+- Runs `php artisan db:seed` (idempotent — uses `firstOrCreate`)
+- Caches config / routes / views
+- Marks `app_meta.setup_completed_at` so the wizard is skipped
+
+You land on the login page. Sign in with the demo user:
+
+- **Email:** `demo@solar.app`
+- **Password:** `solar123`
+
+(There are also `demo@en.solar.app` and `demo@es.solar.app` — same password — for testing the i18n surface.)
+
+### Cost
+
+| Service | Plan | Monthly cost | What you get |
+|---|---|---|---|
+| solar-money | free | $0 | Spins down after 15min idle. First cold start ~30s. 750h/mo. |
+| solar-money | starter | $7/mo | Always on. Faster CPU. Custom domain. |
+| solar-db | free | $0 | 1GB Postgres, 90-day backups. |
+| solar-db | starter | $7/mo | Daily backups, 7-day retention. |
+
+Free tier is enough for a personal demo. The starter plan is recommended for anything user-facing because the spin-down delay hurts the experience.
+
+### What's NOT free (and why)
+
+- **Redis / Memcached** — Laravel's `CACHE_STORE=database` and `SESSION_DRIVER=database` work fine on free Postgres. No need for Redis on the free tier.
+- **S3 / file storage** — Render's free tier disk is ephemeral (resets on every redeploy). User-uploaded avatars or attachments will not survive a redeploy. If you need persistent uploads, upgrade to the starter plan ($7/mo) or wire up an S3-compatible service.
+- **CDN in front** — Render's free tier doesn't include a CDN. Cloudflare's free tier in front of Render is the standard upgrade path; add it later when you need global edge caching.
+
+### Files added by this FASE
+
+| File | Purpose |
+|---|---|
+| `render.yaml` | Render Blueprint — declares web service + Postgres |
+| `Dockerfile` | Multi-stage build: Node 22 (assets) + Composer 2 (vendor) + PHP 8.4-FPM (runtime) |
+| `.dockerignore` | Excludes `.git`, tests, screenshots, etc. from the image |
+| `docker/nginx.conf` | Production nginx (port 10000, gzip, immutable cache for fingerprinted assets) |
+| `docker/php-fpm.conf` | PHP-FPM tuning for low-memory containers |
+| `docker/supervisord.conf` | Runs both nginx + php-fpm in the single Render container |
+| `docker-entrypoint.sh` | Waits for DB → migrate → seed → cache → exec supervisord |
+
+### Local Docker build (optional)
+
+If you have Docker Desktop installed:
+
+```bash
+docker build -t solar-money .
+docker run --rm -p 10000:10000 \
+    --env-file .env \
+    solar-money
+```
+
+Then open `http://localhost:10000`. The entrypoint runs the same migrate + seed + cache pipeline as Render.
+
+### Alternative platforms
+
+The same Dockerfile + docker-entrypoint.sh work on:
+
+- **Railway.app** — `railway up` after `railway link`. Uses a different env-var store but the image is the same.
+- **Fly.io** — `fly launch` to generate `fly.toml`, then `fly deploy`. Uses port 8080 by default (override with `PORT` env var).
+- **Any VPS** (DigitalOcean, Vultr, Hetzner, AWS Lightsail) — `docker compose up -d` on a $5/mo Ubuntu box.
+
+Cloudflare Pages **does not work** — it's a static-site CDN and does not run PHP. Solar is a Laravel monolith and needs a real PHP runtime.
+
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE).
