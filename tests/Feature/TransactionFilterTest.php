@@ -29,26 +29,31 @@ class TransactionFilterTest extends TestCase
         $catTransp = Category::firstOrCreate(['name' => 'Transporte', 'user_id' => null],
             ['type' => 'expense', 'icon' => '🚗', 'color' => '#10b981', 'is_default' => true]);
 
-        // June 2026 transactions
+        // Anchor on the current month (so the `period=this_month` filter has
+        // data regardless of when the test runs — previously these dates
+        // were hardcoded to 2026-06-XX which broke once we crossed into July).
+        $currentMonth = now()->startOfMonth();
+        $prevMonth = $currentMonth->copy()->subMonth();
+
         Transaction::create([
             'user_id' => $user->id, 'account_id' => $acc1->id, 'category_id' => $catFood->id,
-            'type' => 'expense', 'amount_cents' => -5000, 'date' => '2026-06-10',
+            'type' => 'expense', 'amount_cents' => -5000, 'date' => $currentMonth->copy()->addDays(4)->toDateString(),
             'description' => 'iFood', 'status' => 'paid',
         ]);
         Transaction::create([
             'user_id' => $user->id, 'account_id' => $acc2->id, 'category_id' => $catTransp->id,
-            'type' => 'expense', 'amount_cents' => -3000, 'date' => '2026-06-15',
+            'type' => 'expense', 'amount_cents' => -3000, 'date' => $currentMonth->copy()->addDays(9)->toDateString(),
             'description' => 'Uber', 'status' => 'paid',
         ]);
         Transaction::create([
             'user_id' => $user->id, 'account_id' => $acc1->id, 'category_id' => null,
-            'type' => 'income', 'amount_cents' => 100000, 'date' => '2026-06-05',
+            'type' => 'income', 'amount_cents' => 100000, 'date' => $currentMonth->copy()->addDays(2)->toDateString(),
             'description' => 'Salario', 'status' => 'paid',
         ]);
-        // May 2026
+        // Previous month — must NOT appear in this_month filter.
         Transaction::create([
             'user_id' => $user->id, 'account_id' => $acc1->id, 'category_id' => $catFood->id,
-            'type' => 'expense', 'amount_cents' => -2000, 'date' => '2026-05-12',
+            'type' => 'expense', 'amount_cents' => -2000, 'date' => $prevMonth->copy()->addDays(11)->toDateString(),
             'description' => 'Mercado', 'status' => 'paid',
         ]);
 

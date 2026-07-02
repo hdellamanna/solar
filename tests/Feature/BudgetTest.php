@@ -72,6 +72,11 @@ class BudgetTest extends TestCase
             'alert_threshold' => 80,
         ]);
 
+        // Anchor on the current month. Previously these dates used
+        // `subDays(2)` / `subDays(1)` which broke once the test ran at the
+        // beginning of a month (the sub-day rolled into the previous month).
+        $monthAnchor = CarbonImmutable::today()->startOfMonth()->addDays(4);
+
         // Create two expenses in the current month.
         Transaction::create([
             'user_id' => $user->id,
@@ -79,7 +84,7 @@ class BudgetTest extends TestCase
             'category_id' => $category->id,
             'type' => 'expense',
             'amount_cents' => -25000,
-            'date' => CarbonImmutable::today()->subDays(2)->toDateString(),
+            'date' => $monthAnchor->toDateString(),
             'description' => 'Mercado',
             'status' => 'paid',
         ]);
@@ -89,7 +94,7 @@ class BudgetTest extends TestCase
             'category_id' => $category->id,
             'type' => 'expense',
             'amount_cents' => -15500,
-            'date' => CarbonImmutable::today()->subDays(1)->toDateString(),
+            'date' => $monthAnchor->copy()->addDays(1)->toDateString(),
             'description' => 'iFood',
             'status' => 'paid',
         ]);
@@ -101,7 +106,7 @@ class BudgetTest extends TestCase
             'category_id' => $category->id,
             'type' => 'income',
             'amount_cents' => 50000,
-            'date' => CarbonImmutable::today()->toDateString(),
+            'date' => $monthAnchor->copy()->addDays(2)->toDateString(),
             'description' => 'Reembolso',
             'status' => 'paid',
         ]);

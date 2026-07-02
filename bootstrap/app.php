@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureEmailIsVerified;
 use App\Http\Middleware\EnsureTwoFactorVerified;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\InjectRequestId;
+use App\Http\Middleware\RequireSetup;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -50,6 +51,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // render of the page.
         $middleware->web(prepend: [
             SetLocale::class,
+        ]);
+
+        // FASE Deploy — first-boot setup wizard. After locale
+        // resolution, redirect every request to /setup when
+        // `app_meta.setup_completed_at` is null. Carve-outs:
+        // setup routes themselves + /up + static assets.
+        $middleware->web(prepend: [
+            RequireSetup::class,
         ]);
 
         $middleware->web(append: [
