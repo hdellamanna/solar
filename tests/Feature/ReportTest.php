@@ -256,13 +256,17 @@ class ReportTest extends TestCase
         $aliceAcc = $this->makeAccount($alice, 'Alice Bank');
         $bobAcc = $this->makeAccount($bob, 'Bob Bank');
 
+        // Anchor on the current month — kpis.income_cents is the current
+        // month's income total, so transactions must be in this month.
+        $currentMonth = \Carbon\CarbonImmutable::today()->startOfMonth()->addDays(4);
+
         Transaction::create([
             'user_id' => $alice->id,
             'account_id' => $aliceAcc->id,
             'category_id' => null,
             'type' => 'income',
             'amount_cents' => 999900,
-            'date' => '2026-06-15',
+            'date' => $currentMonth->toDateString(),
             'description' => 'Alice salary',
             'status' => 'paid',
         ]);
@@ -272,7 +276,7 @@ class ReportTest extends TestCase
             'category_id' => null,
             'type' => 'income',
             'amount_cents' => 50000,
-            'date' => '2026-06-15',
+            'date' => $currentMonth->toDateString(),
             'description' => 'Bob income',
             'status' => 'paid',
         ]);

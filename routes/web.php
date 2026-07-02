@@ -26,6 +26,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\Settings\AppearanceController;
 use App\Http\Controllers\Settings\LocaleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\Setup\SetupController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\TransactionController;
@@ -59,6 +60,21 @@ Route::get('/', function () {
 
     return redirect()->route('login');
 })->name('home');
+
+/*
+|--------------------------------------------------------------------------
+| First-boot setup wizard (FASE Deploy)
+|--------------------------------------------------------------------------
+|
+| Reachable when app_meta.setup_completed_at is null. The RequireSetup
+| middleware redirects every other request here until the operator
+| completes the wizard. Lives outside the `guest` group because the
+| operator is not logged in yet.
+|
+*/
+Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
+Route::post('/setup', [SetupController::class, 'store'])->name('setup.store');
+Route::post('/setup/skip', [SetupController::class, 'skip'])->name('setup.skip');
 
 /*
 |--------------------------------------------------------------------------
