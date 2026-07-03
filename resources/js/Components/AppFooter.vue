@@ -7,7 +7,7 @@
  * `motion.spring` is enabled. When reduced, it's static from the first paint.
  */
 import { ref, onMounted, onUnmounted, computed } from 'vue';
-import { useMotionPreference } from '@/composables/useMotionPreference';
+import { useMotionPreference } from '@/Composables/useMotionPreference';
 import { usePage } from '@inertiajs/vue3';
 
 const page = usePage();

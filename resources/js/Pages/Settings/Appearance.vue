@@ -9,7 +9,7 @@ import { ref, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head } from '@inertiajs/vue3';
-import { useMotionPreference } from '@/composables/useMotionPreference';
+import { useMotionPreference } from '@/Composables/useMotionPreference';
 
 const props = defineProps({
     user: { type: Object, required: true },

@@ -8,8 +8,8 @@
  * mount) and is hidden when config('features.ai_agent') is false.
  */
 import { ref, computed, nextTick, watch } from 'vue';
-import { useAiAgent } from '@/composables/useAiAgent';
-import { useMotionPreference } from '@/composables/useMotionPreference';
+import { useAiAgent } from '@/Composables/useAiAgent';
+import { useMotionPreference } from '@/Composables/useMotionPreference';
 import { usePage } from '@inertiajs/vue3';
 
 const { isOpen, open, close, toggle, registerInput, focusInput } = useAiAgent();

@@ -49,6 +49,16 @@ fi
 log "Running migrations..."
 php artisan migrate --force --no-interaction
 
+# ── 2b. Fix storage ownership after migrate/seed ────────────────────────
+# The entrypoint runs as root but php-fpm (which serves requests) runs as
+# www-data. If DB_CONNECTION=sqlite, `migrate` creates the .sqlite file as
+# root and www-data can't write to it on the first request — so /up returns
+# a 500 with "attempt to write a readonly database". We chown the entire
+# storage tree so www-data can read+write everything it needs. This is a
+# no-op for Postgres deployments (no sqlite file) but harmless either way.
+chown -R www-data:www-data /app/storage 2>/dev/null || true
+chmod -R ug+rwX /app/storage 2>/dev/null || true
+
 # ── 3. Seed (idempotent) ────────────────────────────────────────────────
 # The DatabaseSeeder uses firstOrCreate everywhere, so re-running on
 # every boot is safe. Skip if explicitly disabled via SEED_ON_BOOT=false.

@@ -32,16 +32,20 @@ WORKDIR /app
 
 COPY composer.json composer.lock ./
 # --no-scripts skips the auto-discover post-install hook (which requires
-# a full app to bootstrap, e.g. APP_KEY).
+# a full app to bootstrap, e.g. APP_KEY, and the artisan binary).
 # --no-dev excludes dev-only packages (phpunit, mockery, fakerphp).
 # --optimize-autoloader builds the classmap for faster boot.
+# We do NOT run `composer dump-autoload --classmap-authoritative` here:
+# it triggers the @php artisan package:discover script, which fails
+# because this stage only contains composer.json/lock. The non-authoritative
+# dump is run in the runtime stage (where artisan exists) after the app
+# code is copied.
 RUN composer install \
         --no-dev \
         --no-scripts \
         --optimize-autoloader \
         --prefer-dist \
-        --no-interaction \
-    && composer dump-autoload --optimize --classmap-authoritative --no-dev
+        --no-interaction
 
 # ── Stage 3: runtime image ────────────────────────────────────────────
 FROM php:8.4-fpm-alpine AS runtime
@@ -59,6 +63,7 @@ RUN apk add --no-cache \
         libpng-dev \
         libjpeg-turbo-dev \
         freetype-dev \
+        sqlite-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo \
@@ -99,9 +104,17 @@ COPY . .
 # Copy vendor + assets from earlier stages
 COPY --from=vendor /app/vendor ./vendor
 COPY --from=assets /app/public/build ./public/build
+# Bring the composer binary across so we can regenerate the autoloader
+# against the now-present app code (vendor stage skipped the dump because
+# artisan wasn't there yet, and `composer dump-autoload --classmap-authoritative`
+# would have triggered @php artisan package:discover prematurely).
+COPY --from=vendor /usr/bin/composer /usr/bin/composer
 
-# Generate optimized autoloader (the stage-2 dump was --classmap-authoritative
-# but we need a non-authoritative one so Laravel's class discovery still works).
+# Regenerate the autoloader in non-authoritative mode now that artisan is
+# available. The vendor stage skipped the dump because it would have triggered
+# `@php artisan package:discover` before the app code was present. We avoid
+# --classmap-authoritative here so Laravel's runtime class discovery (e.g.
+# service providers, event listeners registered via config files) still works.
 RUN composer dump-autoload --optimize --no-dev
 
 # Create runtime directories with correct ownership
