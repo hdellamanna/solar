@@ -30,3 +30,4 @@ Thumbs.db
 /public/build
 /public/hot
 /storage/*.key
+.env.sqlite.bak
