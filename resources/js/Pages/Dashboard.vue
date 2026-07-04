@@ -109,7 +109,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
 
         <!-- ─── Quick stats — 3 liquid-glass tiles com sparklines ─── -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
-            <div class="glass stat-tile-glass glass-sweep">
+            <div class="glass stat-tile-glass glass-sweep transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Receitas do mês</p>
@@ -130,7 +130,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                 </div>
             </div>
 
-            <div class="glass stat-tile-glass glass-sweep">
+            <div class="glass stat-tile-glass glass-sweep transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Despesas do mês</p>
@@ -151,7 +151,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                 </div>
             </div>
 
-            <div class="glass stat-tile-glass glass-sweep">
+            <div class="glass stat-tile-glass glass-sweep transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <p class="text-xs text-ink-500 dark:text-ink-400">Economia do mês</p>

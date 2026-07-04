@@ -62,7 +62,7 @@ const { t } = useT();
                     </div>
                     <div>
                         <div class="text-xl font-display font-bold tracking-tight text-gradient-aurora">{{ t('app.brand') }}</div>
-                        <div class="text-[11px] uppercase tracking-[0.18em] text-white/50">{{ t('app.tagline') }}</div>
+                        <div class="text-[11px] text-white/55 font-medium select-none">{{ t('app.tagline') }}</div>
                     </div>
                 </Link>
 
