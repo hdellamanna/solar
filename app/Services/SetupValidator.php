@@ -117,14 +117,16 @@ class SetupValidator
      * Some env vars (APP_KEY, APP_URL) are populated by Laravel into the
      * config at boot, so config() is the more reliable source in tests and
      * in CLI contexts.
+     *
+     * For keys that we explicitly map to a config() key, config() takes
+     * priority over env() — even when config is null/empty. This lets
+     * tests set config([... => null]) to simulate "operator unset" without
+     * the live .env value leaking in via the env() fallback.
+     *
+     * For keys NOT in the map (default branch), env() is the only source.
      */
     private function resolve(string $key): ?string
     {
-        // The env() helper in Laravel is backed by a Repository singleton
-        // that caches values on first read. Once read, even a putenv()
-        // change won't be visible. We read config() first (which is what
-        // tests + Laravel itself populate at boot) and only fall back to
-        // env() if config is unset.
         $configKey = match ($key) {
             'APP_KEY'           => 'app.key',
             'APP_URL'           => 'app.url',
@@ -136,14 +138,27 @@ class SetupValidator
             'CACHE_STORE'       => 'cache.default',
             'QUEUE_CONNECTION'  => 'queue.default',
             'FILESYSTEM_DISK'   => 'filesystems.default',
+            'RESEND_API_KEY'    => 'services.resend.key',
+            // OAuth providers (FASE 8 — config/services.php keys added when implemented)
+            'GOOGLE_CLIENT_ID'     => 'services.google.client_id',
+            'GOOGLE_CLIENT_SECRET' => 'services.google.client_secret',
+            'APPLE_CLIENT_ID'      => 'services.apple.client_id',
+            'APPLE_CLIENT_SECRET'  => 'services.apple.client_secret',
+            'MICROSOFT_CLIENT_ID'  => 'services.microsoft.client_id',
+            'MICROSOFT_CLIENT_SECRET' => 'services.microsoft.client_secret',
             default             => null,
         };
 
         if ($configKey !== null) {
+            // config() takes priority. Even when config is null/empty,
+            // we don't fall back to env() — config is the operator's
+            // explicit intent. This matches the test contract: setting
+            // config([key => null]) must produce the "missing" state.
             $configValue = config($configKey);
-            if ($configValue !== null && $configValue !== '') {
+            if ($configValue !== null && $configValue !== '' && $configValue !== false) {
                 return (string) $configValue;
             }
+            return null;
         }
 
         $value = env($key);
