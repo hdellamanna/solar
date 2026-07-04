@@ -36,7 +36,7 @@ return new class extends Migration
 
         if (Schema::hasTable('tags') && Schema::hasColumn('tags', 'name')) {
             DB::table('tags')->whereNotNull('name')->update([
-                'name_pt' => DB::raw('`name`'),
+                'name_pt' => DB::raw('name'),
             ]);
         }
     }

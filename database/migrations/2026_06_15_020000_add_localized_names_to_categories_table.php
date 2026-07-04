@@ -45,7 +45,7 @@ return new class extends Migration
         // path keeps reading `name` directly.
         if (Schema::hasTable('categories') && Schema::hasColumn('categories', 'name')) {
             DB::table('categories')->whereNotNull('name')->update([
-                'name_pt' => DB::raw('`name`'),
+                'name_pt' => DB::raw('name'),
             ]);
         }
     }
