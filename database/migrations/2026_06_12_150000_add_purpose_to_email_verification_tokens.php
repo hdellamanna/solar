@@ -35,21 +35,50 @@ return new class extends Migration
             $table->dropIndex(['user_id', 'expires_at']);
         });
 
-        // CHECK constraint enforced at the database layer. SQLite
-        // (used in dev + CI) honours the same syntax for CHECK
-        // constraints, so this works across all targets.
-        DB::statement(
-            "ALTER TABLE email_verification_tokens "
-            ."ADD CONSTRAINT evt_purpose_chk "
-            ."CHECK (purpose IN ('email_verification', 'password_reset'))"
-        );
+        // CHECK constraint enforced at the database layer.
+        // NOTE: SQLite (3.46.1) does NOT support ALTER TABLE ADD CONSTRAINT CHECK.
+        // MySQL/Postgres do. Driver-aware: SQLite uses BEFORE INSERT/UPDATE triggers
+        // to emulate the constraint; MySQL/Postgres use ALTER TABLE ADD CONSTRAINT.
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+            DB::statement(
+                "ALTER TABLE email_verification_tokens "
+                ."ADD CONSTRAINT evt_purpose_chk "
+                ."CHECK (purpose IN ('email_verification', 'password_reset'))"
+            );
+        } elseif ($driver === 'sqlite') {
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_insert
+                BEFORE INSERT ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset');
+                END
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_update
+                BEFORE UPDATE ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset');
+                END
+            SQL);
+        }
     }
 
     public function down(): void
     {
-        DB::statement(
-            'ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk'
-        );
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+            DB::statement(
+                'ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk'
+            );
+        } elseif ($driver === 'sqlite') {
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_insert');
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_update');
+        }
 
         Schema::table('email_verification_tokens', function (Blueprint $table) {
             $table->dropIndex('evt_user_purpose_expires_idx');

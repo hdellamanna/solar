@@ -45,18 +45,44 @@ return new class extends Migration
     {
         // 1) Extend the purpose CHECK constraint.
         //
-        // SQLite (dev + CI) and Postgres (prod) both honour this
-        // syntax. The new values are appended to the existing list,
-        // so no existing row is invalidated.
-        DB::statement('ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk');
-        DB::statement(
-            "ALTER TABLE email_verification_tokens "
-            ."ADD CONSTRAINT evt_purpose_chk "
-            ."CHECK (purpose IN ("
-            ."'email_verification', 'password_reset', "
-            ."'two_factor_enroll', 'two_factor_disable'"
-            ."))"
-        );
+        // NOTE: SQLite (3.46.1) does NOT support ALTER TABLE ADD CONSTRAINT CHECK.
+        // MySQL/Postgres do. Driver-aware: SQLite uses BEFORE INSERT/UPDATE triggers
+        // to emulate the constraint; MySQL/Postgres use ALTER TABLE ADD CONSTRAINT.
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+            DB::statement('ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk');
+            DB::statement(
+                "ALTER TABLE email_verification_tokens "
+                ."ADD CONSTRAINT evt_purpose_chk "
+                ."CHECK (purpose IN ("
+                ."'email_verification', 'password_reset', "
+                ."'two_factor_enroll', 'two_factor_disable'"
+                ."))"
+            );
+        } elseif ($driver === 'sqlite') {
+            // Drop any pre-existing triggers from a previous run (defensive — fresh DB
+            // doesn't have them, but a re-run after a partial migration might).
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_insert');
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_update');
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_insert
+                BEFORE INSERT ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset', 'two_factor_enroll', 'two_factor_disable')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset, two_factor_enroll, two_factor_disable');
+                END
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_update
+                BEFORE UPDATE ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset', 'two_factor_enroll', 'two_factor_disable')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset, two_factor_enroll, two_factor_disable');
+                END
+            SQL);
+        }
 
         // The 2FA enable flow stashes the freshly-minted (encrypted)
         // TOTP secret on the token row between the GET and the POST
@@ -119,11 +145,36 @@ return new class extends Migration
         // Any token rows still using the new purposes will fail this
         // constraint after the down — caller's responsibility to scrub
         // those first (or run a down only in tests).
-        DB::statement('ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk');
-        DB::statement(
-            "ALTER TABLE email_verification_tokens "
-            ."ADD CONSTRAINT evt_purpose_chk "
-            ."CHECK (purpose IN ('email_verification', 'password_reset'))"
-        );
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['mysql', 'mariadb', 'pgsql'], true)) {
+            DB::statement('ALTER TABLE email_verification_tokens DROP CONSTRAINT evt_purpose_chk');
+            DB::statement(
+                "ALTER TABLE email_verification_tokens "
+                ."ADD CONSTRAINT evt_purpose_chk "
+                ."CHECK (purpose IN ('email_verification', 'password_reset'))"
+            );
+        } elseif ($driver === 'sqlite') {
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_insert');
+            DB::statement('DROP TRIGGER IF EXISTS evt_purpose_chk_update');
+            // Re-create the PR2-shape triggers (only email_verification + password_reset)
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_insert
+                BEFORE INSERT ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset');
+                END
+            SQL);
+            DB::statement(<<<'SQL'
+                CREATE TRIGGER evt_purpose_chk_update
+                BEFORE UPDATE ON email_verification_tokens
+                FOR EACH ROW
+                WHEN NEW.purpose NOT IN ('email_verification', 'password_reset')
+                BEGIN
+                    SELECT RAISE(ABORT, 'evt_purpose_chk constraint failed: purpose must be one of: email_verification, password_reset');
+                END
+            SQL);
+        }
     }
 };
