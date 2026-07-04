@@ -29,7 +29,7 @@ services:
       - key: APP_KEY
         generateValue: true
       - key: APP_URL
-        fromService: { type: web, name: solar-money, property: hostUrl }
+        fromService: { type: web, name: solar-money, property: host }
       - key: APP_LOCALE
         value: pt-BR
       - key: APP_FALLBACK_LOCALE
@@ -50,7 +50,7 @@ services:
       - key: DB_CONNECTION
         value: pgsql
       - key: DATABASE_URL
-        fromService: { type: pserv, name: solar-db, property: databaseConnectionString }
+        fromService: { type: pserv, name: solar-db, property: connectionString }
       - key: DB_SSLMODE
         value: require
       # Cache / queue / session on database so we don't need Redis on the free tier.
@@ -94,4 +94,6 @@ services:
   - type: pserv
     name: solar-db
     plan: free
-    ipAllowList: []  # only the web service in the same Render account can connect
+    region: oregon
+    # pserv is a managed Postgres — no runtime, no startCommand, no ipAllowList.
+    # Render exposes its DATABASE_URL via the connectionString property above.
