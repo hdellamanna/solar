@@ -15,9 +15,12 @@ FROM node:22-alpine AS assets
 
 WORKDIR /app
 
-# Copy only the manifest first to leverage Docker layer cache
+# Copy only the manifest first to leverage Docker layer cache.
+# The `date` invocation forces this layer (and the npm ci step) to re-run on
+# every build, busting any cached node_modules from a previous deploy where a
+# different tailwindcss major was installed.
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN echo "build-id: $(date -u +%s)" && npm ci --no-audit --no-fund
 
 # Copy build config + source, then build
 COPY vite.config.js tailwind.config.js postcss.config.js ./
