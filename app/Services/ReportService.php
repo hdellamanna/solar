@@ -53,9 +53,11 @@ class ReportService
         $start = CarbonImmutable::today()->subMonths($months - 1)->startOfMonth();
 
         $driver = DB::connection()->getDriverName();
-        $monthExpr = $driver === 'sqlite'
-            ? "strftime('%Y-%m', date)"
-            : "DATE_FORMAT(date, '%Y-%m')";
+        $monthExpr = match ($driver) {
+            'sqlite' => "strftime('%Y-%m', date)",
+            'pgsql' => "to_char(date, 'YYYY-MM')",
+            default => "DATE_FORMAT(date, '%Y-%m')", // mysql, mariadb
+        };
 
         $rows = Transaction::query()
             ->where('user_id', $user->id)
@@ -98,9 +100,11 @@ class ReportService
     public function categoryBreakdown(User $user, string $from, string $to, int $limit = 10): array
     {
         $driver = DB::connection()->getDriverName();
-        $absExpr = $driver === 'sqlite'
-            ? 'ABS(SUM(transactions.amount_cents))'
-            : 'SUM(ABS(transactions.amount_cents))';
+        $absExpr = match ($driver) {
+            'sqlite' => 'ABS(SUM(transactions.amount_cents))',
+            'pgsql' => 'SUM(ABS(transactions.amount_cents))',
+            default => 'SUM(ABS(transactions.amount_cents))', // mysql, mariadb
+        };
 
         $rows = DB::table('transactions')
             ->leftJoin('categories', 'categories.id', '=', 'transactions.category_id')
