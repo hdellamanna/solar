@@ -21,6 +21,13 @@ cd /app
 
 log() { echo "[entrypoint] $*" >&2; }
 
+# Debug env (will be removed once APP_URL is verified to flow through)
+log "Effective env at startup:"
+log "  APP_URL=${APP_URL:-<unset>}"
+log "  ASSET_URL=${ASSET_URL:-<unset>}"
+log "  APP_ENV=${APP_ENV:-<unset>}"
+log "  FORCE_HTTPS=${FORCE_HTTPS:-<unset>}"
+
 # ── 1. Wait for database ─────────────────────────────────────────────────
 if [[ -n "${DATABASE_URL:-}" ]]; then
     log "Waiting for database (DATABASE_URL set)..."
