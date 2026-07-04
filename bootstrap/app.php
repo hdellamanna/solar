@@ -71,6 +71,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // `throttle:NAME` in routes/api.php / web.php.
         $middleware->throttleApi();
 
+        // Trust Render's edge proxy. Without this, Laravel sees the
+        // request as HTTP (because Render proxies HTTP to our nginx)
+        // and `url('/')` returns http://. This makes Ziggy embed
+        // http://solar.dellamanna.org and the front-end POSTs the
+        // login form to a Mixed-Content endpoint that the browser
+        // blocks, leaving the page blank after submit.
+        $middleware->trustProxies(
+            at: '*',
+            headers: \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR
+                | \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST
+                | \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
+                | \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT
+                | \Illuminate\Http\Request::HEADER_X_FORWARDED_PREFIX,
+        );
+
         // Aliases. The `verified` alias is the Laravel convention and
         // is what `routes/web.php` uses to gate authenticated routes
         // behind a confirmed email address (FASE 4D / Auth Phase 1).
