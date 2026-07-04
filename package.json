@@ -26,5 +26,8 @@
         "vue-router": "^5.1.0",
         "vue3-apexcharts": "^1.11.1",
         "ziggy-js": "^2.6.2"
+    },
+    "overrides": {
+        "tailwindcss": "^3.4.19"
     }
 }
