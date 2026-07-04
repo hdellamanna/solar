@@ -26,7 +26,7 @@ class SetupValidatorTest extends TestCase
     {
         parent::setUp();
         $this->withoutAutoSetupComplete();
-        $this->validator = new SetupValidator();
+        $this->validator = new SetupValidator;
     }
 
     public function test_required_are_set_returns_false_when_app_key_missing(): void
@@ -66,11 +66,11 @@ class SetupValidatorTest extends TestCase
     public function test_required_are_set_returns_true_when_everything_set(): void
     {
         config([
-            'app.key'             => 'base64:'.str_repeat('a', 44),
-            'app.url'             => 'https://solar.example',
-            'database.default'    => 'sqlite',
-            'mail.default'        => 'log',
-            'mail.from.address'   => 'demo@solar.app',
+            'app.key' => 'base64:'.str_repeat('a', 44),
+            'app.url' => 'https://solar.example',
+            'database.default' => 'sqlite',
+            'mail.default' => 'log',
+            'mail.from.address' => 'demo@solar.app',
         ]);
 
         $this->assertTrue($this->validator->requiredAreSet());
@@ -87,7 +87,7 @@ class SetupValidatorTest extends TestCase
         $this->assertDatabaseMissing('app_meta', ['key' => 'setup_completed_at']);
 
         AppMeta::create([
-            'key'   => 'setup_completed_at',
+            'key' => 'setup_completed_at',
             'value' => now()->toIso8601String(),
         ]);
 
@@ -125,11 +125,11 @@ class SetupValidatorTest extends TestCase
         // Setting config() alone is enough — the validator doesn't fall back to env()
         // for mapped keys.
         config([
-            'app.key'             => 'base64:'.str_repeat('a', 44),
-            'app.url'             => 'https://solar.example',
-            'database.default'    => 'sqlite',
-            'mail.default'        => 'log',
-            'mail.from.address'   => 'demo@solar.app',
+            'app.key' => 'base64:'.str_repeat('a', 44),
+            'app.url' => 'https://solar.example',
+            'database.default' => 'sqlite',
+            'mail.default' => 'log',
+            'mail.from.address' => 'demo@solar.app',
             'services.resend.key' => 're_supersecretkey123456789',
         ]);
 

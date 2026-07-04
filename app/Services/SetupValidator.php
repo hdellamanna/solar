@@ -26,7 +26,7 @@ class SetupValidator
         ['key' => 'APP_URL',          'label' => 'APP_URL',          'description' => 'URL pública do app (sem barra final). Render injeta do host do serviço.', 'secret' => false],
         ['key' => 'DB_CONNECTION',    'label' => 'DB_CONNECTION',    'description' => 'Driver do banco (sqlite, pgsql, mysql). Padrão: sqlite local; pgsql no Render.', 'secret' => false],
         ['key' => 'MAIL_MAILER',      'label' => 'MAIL_MAILER',      'description' => 'Driver de email. "log" em dev (não envia), "resend" em produção.', 'secret' => false],
-        ['key' => 'MAIL_FROM_ADDRESS','label' => 'MAIL_FROM_ADDRESS','description' => 'Endereço do remetente (ex: noreply@solar.app). Deve ser um domínio verificado no Resend.', 'secret' => false],
+        ['key' => 'MAIL_FROM_ADDRESS', 'label' => 'MAIL_FROM_ADDRESS', 'description' => 'Endereço do remetente (ex: noreply@solar.app). Deve ser um domínio verificado no Resend.', 'secret' => false],
     ];
 
     public const OPTIONAL_VARS = [
@@ -42,7 +42,7 @@ class SetupValidator
         ['key' => 'APPLE_CLIENT_ID',      'label' => 'APPLE_CLIENT_ID',      'description' => 'Apple Sign In client ID (FASE 8).', 'secret' => true],
         ['key' => 'APPLE_CLIENT_SECRET',  'label' => 'APPLE_CLIENT_SECRET',  'description' => 'Apple Sign In client secret (FASE 8).', 'secret' => true],
         ['key' => 'MICROSOFT_CLIENT_ID',  'label' => 'MICROSOFT_CLIENT_ID',  'description' => 'Microsoft OAuth client ID (FASE 8).', 'secret' => true],
-        ['key' => 'MICROSOFT_CLIENT_SECRET','label' => 'MICROSOFT_CLIENT_SECRET','description' => 'Microsoft OAuth client secret (FASE 8).', 'secret' => true],
+        ['key' => 'MICROSOFT_CLIENT_SECRET', 'label' => 'MICROSOFT_CLIENT_SECRET', 'description' => 'Microsoft OAuth client secret (FASE 8).', 'secret' => true],
     ];
 
     /**
@@ -102,13 +102,13 @@ class SetupValidator
         $isSet = $value !== null && $value !== '' && $value !== false;
 
         return [
-            'key'           => $entry['key'],
-            'label'         => $entry['label'],
-            'description'   => $entry['description'],
-            'secret'        => $entry['secret'],
-            'required'      => $required,
+            'key' => $entry['key'],
+            'label' => $entry['label'],
+            'description' => $entry['description'],
+            'secret' => $entry['secret'],
+            'required' => $required,
             'current_value' => $isSet ? ($entry['secret'] ? $this->mask($value) : $value) : null,
-            'is_set'        => $isSet,
+            'is_set' => $isSet,
         ];
     }
 
@@ -128,25 +128,25 @@ class SetupValidator
     private function resolve(string $key): ?string
     {
         $configKey = match ($key) {
-            'APP_KEY'           => 'app.key',
-            'APP_URL'           => 'app.url',
-            'DB_CONNECTION'     => 'database.default',
-            'MAIL_MAILER'       => 'mail.default',
+            'APP_KEY' => 'app.key',
+            'APP_URL' => 'app.url',
+            'DB_CONNECTION' => 'database.default',
+            'MAIL_MAILER' => 'mail.default',
             'MAIL_FROM_ADDRESS' => 'mail.from.address',
-            'APP_LOCALE'        => 'app.locale',
-            'SESSION_DRIVER'    => 'session.driver',
-            'CACHE_STORE'       => 'cache.default',
-            'QUEUE_CONNECTION'  => 'queue.default',
-            'FILESYSTEM_DISK'   => 'filesystems.default',
-            'RESEND_API_KEY'    => 'services.resend.key',
+            'APP_LOCALE' => 'app.locale',
+            'SESSION_DRIVER' => 'session.driver',
+            'CACHE_STORE' => 'cache.default',
+            'QUEUE_CONNECTION' => 'queue.default',
+            'FILESYSTEM_DISK' => 'filesystems.default',
+            'RESEND_API_KEY' => 'services.resend.key',
             // OAuth providers (FASE 8 — config/services.php keys added when implemented)
-            'GOOGLE_CLIENT_ID'     => 'services.google.client_id',
+            'GOOGLE_CLIENT_ID' => 'services.google.client_id',
             'GOOGLE_CLIENT_SECRET' => 'services.google.client_secret',
-            'APPLE_CLIENT_ID'      => 'services.apple.client_id',
-            'APPLE_CLIENT_SECRET'  => 'services.apple.client_secret',
-            'MICROSOFT_CLIENT_ID'  => 'services.microsoft.client_id',
+            'APPLE_CLIENT_ID' => 'services.apple.client_id',
+            'APPLE_CLIENT_SECRET' => 'services.apple.client_secret',
+            'MICROSOFT_CLIENT_ID' => 'services.microsoft.client_id',
             'MICROSOFT_CLIENT_SECRET' => 'services.microsoft.client_secret',
-            default             => null,
+            default => null,
         };
 
         if ($configKey !== null) {
@@ -158,6 +158,7 @@ class SetupValidator
             if ($configValue !== null && $configValue !== '' && $configValue !== false) {
                 return (string) $configValue;
             }
+
             return null;
         }
 
@@ -188,6 +189,6 @@ class SetupValidator
             return str_repeat('•', strlen($value));
         }
 
-        return substr($value, 0, 4) . str_repeat('•', max(8, strlen($value) - 4));
+        return substr($value, 0, 4).str_repeat('•', max(8, strlen($value) - 4));
     }
 }
