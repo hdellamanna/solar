@@ -51,7 +51,8 @@ RUN composer install \
 FROM php:8.4-fpm-alpine AS runtime
 
 # Install system packages: nginx, supervisor (process manager), curl (health),
-# and the PHP extensions Laravel needs (pdo_mysql, intl, zip, bcmath, opcache).
+# and the PHP extensions Laravel needs (pdo_pgsql for production Postgres,
+# pdo_mysql + pdo_sqlite for dev, intl, zip, bcmath, opcache).
 RUN apk add --no-cache \
         nginx \
         supervisor \
@@ -64,9 +65,11 @@ RUN apk add --no-cache \
         libjpeg-turbo-dev \
         freetype-dev \
         sqlite-dev \
+        libpq-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo \
+        pdo_pgsql \
         pdo_mysql \
         pdo_sqlite \
         intl \
