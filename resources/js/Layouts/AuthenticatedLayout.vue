@@ -253,7 +253,7 @@ const totalResults = () => {
                         <Link :href="route('settings.index')" class="block px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">{{ t('app.settings') }}</Link>
                         <Link :href="route('settings.idioma.show')" class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-ink-100 dark:hover:bg-ink-800/60 transition-colors">
                             <span>{{ t('app.language') }}</span>
-                            <span class="text-[10px] uppercase tracking-wider text-ink-400 font-mono">
+                            <span class="text-[11px] text-ink-400/80 font-mono">
                                 {{ page.props.app?.locale || 'pt-BR' }}
                             </span>
                         </Link>
@@ -353,7 +353,7 @@ const totalResults = () => {
                                     </div>
                                     <div v-else>
                                         <div v-if="searchResults.accounts.length" class="border-b border-ink-100 dark:border-ink-800">
-                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Contas</div>
+                                            <div class="px-3 py-1.5 text-[11px] font-medium text-ink-500 bg-ink-50/40 dark:bg-ink-800/30">Contas</div>
                                             <button v-for="a in searchResults.accounts" :key="'acc-' + a.id" @click="goTo(route('accounts.index', { search: a.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: a.color || '#94a3b8' }"></span>
                                                 <span class="text-sm font-medium flex-1 truncate">{{ a.name }}</span>
@@ -361,7 +361,7 @@ const totalResults = () => {
                                             </button>
                                         </div>
                                         <div v-if="searchResults.categories.length" class="border-b border-ink-100 dark:border-ink-800">
-                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Categorias</div>
+                                            <div class="px-3 py-1.5 text-[11px] font-medium text-ink-500 bg-ink-50/40 dark:bg-ink-800/30">Categorias</div>
                                             <button v-for="c in searchResults.categories" :key="'cat-' + c.id" @click="goTo(route('transactions.index', { category_ids: [c.id] }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="text-base">{{ c.icon || '📦' }}</span>
                                                 <span class="text-sm font-medium flex-1 truncate">{{ c.name }}</span>
@@ -369,14 +369,14 @@ const totalResults = () => {
                                             </button>
                                         </div>
                                         <div v-if="searchResults.tags.length" class="border-b border-ink-100 dark:border-ink-800">
-                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Tags</div>
+                                            <div class="px-3 py-1.5 text-[11px] font-medium text-ink-500 bg-ink-50/40 dark:bg-ink-800/30">Tags</div>
                                             <button v-for="t in searchResults.tags" :key="'tag-' + t.id" @click="goTo(route('transactions.index', { search: t.name }))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: t.color || '#94a3b8' }"></span>
                                                 <span class="text-sm font-medium">#{{ t.name }}</span>
                                             </button>
                                         </div>
                                         <div v-if="searchResults.transactions.length">
-                                            <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ink-400 bg-ink-50/60 dark:bg-ink-800/50">Transações</div>
+                                            <div class="px-3 py-1.5 text-[11px] font-medium text-ink-500 bg-ink-50/40 dark:bg-ink-800/30">Transações</div>
                                             <button v-for="t in searchResults.transactions" :key="'tx-' + t.id" @click="goTo(route('transactions.edit', t.id))" class="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-ink-50 dark:hover:bg-ink-800/60">
                                                 <span class="w-2 h-2 rounded-full" :class="t.type === 'income' ? 'bg-emerald-500' : (t.type === 'transfer' ? 'bg-blue-500' : 'bg-rose-500')"></span>
                                                 <div class="flex-1 min-w-0">

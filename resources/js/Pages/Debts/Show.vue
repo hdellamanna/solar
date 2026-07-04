@@ -94,7 +94,7 @@ const paidOffDisabled = computed(() => props.debt.total_balance_cents > 0);
             <div class="card-elevated p-6 md:p-8 mb-5">
                 <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div class="min-w-0 flex-1">
-                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">{{ debt.description || 'Dívida' }}</p>
+                        <p class="text-[11px] font-medium text-slate-500/90">{{ debt.description || 'Dívida' }}</p>
                         <h2 class="text-2xl md:text-3xl font-bold tracking-tight mt-1">{{ debt.creditor }}</h2>
                     </div>
                     <span
@@ -114,15 +114,15 @@ const paidOffDisabled = computed(() => props.debt.total_balance_cents > 0);
 
                 <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Parcela</p>
+                        <p class="text-[11px] font-medium text-slate-500/90">Parcela</p>
                         <p class="text-lg font-bold tabular-nums mt-1">{{ debt.monthly_payment_formatted }}</p>
                     </div>
                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Taxa a.a.</p>
+                        <p class="text-[11px] font-medium text-slate-500/90">Taxa a.a.</p>
                         <p class="text-lg font-bold tabular-nums mt-1">{{ debt.interest_rate_percent.toFixed(2) }}%</p>
                     </div>
                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Início</p>
+                        <p class="text-[11px] font-medium text-slate-500/90">Início</p>
                         <p class="text-lg font-bold tabular-nums mt-1">{{ formatDate(debt.start_date) }}</p>
                     </div>
                 </div>
@@ -180,7 +180,7 @@ const paidOffDisabled = computed(() => props.debt.total_balance_cents > 0);
                         <div class="p-5 overflow-y-auto flex-1">
                             <!-- Strategy switch -->
                             <div class="flex items-center gap-2 mb-4">
-                                <span class="text-xs uppercase tracking-wider text-slate-500 font-medium">Estratégia:</span>
+                                <span class="text-[11px] font-medium text-slate-500/90">Estratégia:</span>
                                 <div class="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-1">
                                     <button
                                         v-for="s in ['sac', 'price']"
@@ -202,15 +202,15 @@ const paidOffDisabled = computed(() => props.debt.total_balance_cents > 0);
                                 <!-- Summary row -->
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Duração</p>
+                                        <p class="text-[11px] font-medium text-slate-500/90">Duração</p>
                                         <p class="text-lg font-bold tabular-nums mt-1">{{ monthsLabel(simulation.months) }}</p>
                                     </div>
                                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Total de juros</p>
+                                        <p class="text-[11px] font-medium text-slate-500/90">Total de juros</p>
                                         <p class="text-lg font-bold tabular-nums mt-1 text-expense">{{ formatCents(simulation.total_interest_cents) }}</p>
                                     </div>
                                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                                        <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Total pago</p>
+                                        <p class="text-[11px] font-medium text-slate-500/90">Total pago</p>
                                         <p class="text-lg font-bold tabular-nums mt-1">{{ formatCents(simulation.total_paid_cents) }}</p>
                                     </div>
                                 </div>

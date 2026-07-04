@@ -55,19 +55,19 @@ const strategyColor = (s) => (s === 'price' ? 'bg-violet-100 text-violet-700 dar
         <div v-if="(props.totals.count_active ?? 0) > 0" class="card-elevated p-6 md:p-8 mb-6 md:mb-8">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Saldo total</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Saldo total</p>
                     <p class="text-3xl md:text-4xl font-bold tabular-nums tracking-tight mt-2 text-expense">
                         {{ formatCents(props.totals.total_balance_cents ?? 0) }}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Comprometido / mês</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Comprometido / mês</p>
                     <p class="text-2xl md:text-3xl font-semibold tabular-nums tracking-tight mt-2 text-slate-600 dark:text-slate-400">
                         {{ formatCents(props.totals.monthly_commitment_cents ?? 0) }}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Taxa média ponderada</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Taxa média ponderada</p>
                     <p class="text-2xl md:text-3xl font-semibold tabular-nums tracking-tight mt-2 text-slate-600 dark:text-slate-400">
                         {{ ((props.totals.weighted_avg_rate ?? 0) * 100).toFixed(2) }}% a.a.
                     </p>

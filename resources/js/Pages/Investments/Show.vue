@@ -49,7 +49,7 @@ const plSign = (i) => {
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Total investido</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Total investido</p>
                     <p class="text-2xl md:text-3xl font-semibold tabular-nums tracking-tight mt-2 text-slate-700 dark:text-slate-300">
                         {{ formatCents(investment.total_invested_cents) }}
                     </p>
@@ -58,7 +58,7 @@ const plSign = (i) => {
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Valor atual</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Valor atual</p>
                     <p class="text-3xl md:text-4xl font-bold tabular-nums tracking-tight mt-2">
                         {{ investment.has_current_price ? formatCents(investment.current_value_cents) : '—' }}
                     </p>
@@ -67,7 +67,7 @@ const plSign = (i) => {
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Lucro / prejuízo</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Lucro / prejuízo</p>
                     <p
                         class="text-3xl md:text-4xl font-bold tabular-nums tracking-tight mt-2"
                         :class="plClass(investment)"

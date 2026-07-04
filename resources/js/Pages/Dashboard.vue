@@ -266,7 +266,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
             <div class="relative z-10 p-6 md:p-7">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <p class="text-[10px] uppercase tracking-[0.2em] text-white/70 font-bold">Investimentos</p>
+                        <p class="text-[11px] text-white/80 font-medium select-none">Investimentos</p>
                         <p class="font-display text-2xl font-bold mt-1 num">
                             {{ formatCents(investmentsSummary.current_value_cents) }}
                             <span class="text-sm font-normal text-white/70">/ {{ formatCents(investmentsSummary.total_invested_cents) }}</span>
@@ -276,7 +276,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <div class="rounded-2xl bg-white/12 backdrop-blur-md border border-white/10 p-3.5">
-                        <p class="text-[10px] text-white/70 uppercase tracking-wider">P&amp;L</p>
+                        <p class="text-[11px] text-white/70 font-medium">P&amp;L</p>
                         <p class="font-mono text-lg font-bold mt-1 num"
                            :class="investmentsSummary.profit_loss_cents >= 0 ? 'text-emerald-200' : 'text-rose-200'">
                             {{ investmentsSummary.profit_loss_cents >= 0 ? '+' : '' }}{{ formatCents(investmentsSummary.profit_loss_cents) }}
@@ -286,7 +286,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                         </p>
                     </div>
                     <div class="rounded-2xl bg-white/12 backdrop-blur-md border border-white/10 p-3.5">
-                        <p class="text-[10px] text-white/70 uppercase tracking-wider">Posições</p>
+                        <p class="text-[11px] text-white/70 font-medium">Posições</p>
                         <p class="font-mono text-lg font-bold mt-1 num">{{ investmentsSummary.count }}</p>
                     </div>
                     <div v-if="investmentsSummary.by_type.length" class="rounded-2xl bg-white/12 backdrop-blur-md border border-white/10 p-3.5 col-span-2 md:col-span-1">
@@ -327,7 +327,7 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
                     </div>
                     <div class="text-right">
                         <p class="text-sm font-bold tabular-nums num">{{ formatCents(d.total_balance_cents) }}</p>
-                        <p class="text-[10px] text-ink-500 uppercase tracking-wider">{{ d.payoff_strategy.toUpperCase() }}</p>
+                        <p class="text-[11px] text-ink-500/80 font-medium">{{ d.payoff_strategy.toUpperCase() }}</p>
                     </div>
                 </Link>
             </div>

@@ -137,7 +137,7 @@ const logout = () => logoutForm.post(route('logout'));
             </form>
 
             <!-- Divider -->
-            <div class="mt-8 flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-ink-400">
+            <div class="mt-8 flex items-center gap-3 text-[11px] text-ink-400/80">
                 <span class="flex-1 h-px bg-ink-200/70 dark:bg-ink-800/70"></span>
                 <span>Não é você?</span>
                 <span class="flex-1 h-px bg-ink-200/70 dark:bg-ink-800/70"></span>

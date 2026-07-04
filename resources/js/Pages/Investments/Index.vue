@@ -54,19 +54,19 @@ const plClass = (i) => {
         <div v-if="(props.totals.count ?? 0) > 0" class="card-elevated p-6 md:p-8 mb-6 md:mb-8">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Total investido</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Total investido</p>
                     <p class="text-2xl md:text-3xl font-semibold tabular-nums tracking-tight mt-2 text-slate-700 dark:text-slate-300">
                         {{ formatCents(props.totals.total_invested_cents ?? 0) }}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Valor atual</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Valor atual</p>
                     <p class="text-3xl md:text-4xl font-bold tabular-nums tracking-tight mt-2">
                         {{ formatCents(props.totals.current_value_cents ?? 0) }}
                     </p>
                 </div>
                 <div>
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Lucro / prejuízo</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Lucro / prejuízo</p>
                     <p
                         class="text-2xl md:text-3xl font-semibold tabular-nums tracking-tight mt-2"
                         :class="(props.totals.profit_loss_cents ?? 0) > 0 ? 'text-income' : (props.totals.profit_loss_cents ?? 0) < 0 ? 'text-expense' : 'text-slate-500'"

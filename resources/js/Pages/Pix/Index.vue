@@ -94,19 +94,19 @@ async function copyCode() {
         <!-- Month totals (3 cards Apple-style) -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
             <div class="card-elevated p-5">
-                <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Recebido no mês</p>
+                <p class="text-[11px] font-medium text-slate-500/90">Recebido no mês</p>
                 <p class="text-2xl md:text-3xl font-bold tabular-nums tracking-tight text-emerald-600 mt-2">
                     {{ formatCents(props.month_totals.received_cents) }}
                 </p>
             </div>
             <div class="card-elevated p-5">
-                <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Enviado no mês</p>
+                <p class="text-[11px] font-medium text-slate-500/90">Enviado no mês</p>
                 <p class="text-2xl md:text-3xl font-bold tabular-nums tracking-tight text-rose-600 mt-2">
                     {{ formatCents(Math.abs(props.month_totals.sent_cents)) }}
                 </p>
             </div>
             <div class="card-elevated p-5">
-                <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Transações no mês</p>
+                <p class="text-[11px] font-medium text-slate-500/90">Transações no mês</p>
                 <p class="text-2xl md:text-3xl font-bold tabular-nums tracking-tight mt-2">
                     {{ props.month_totals.count }}
                 </p>

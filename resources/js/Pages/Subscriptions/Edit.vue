@@ -175,7 +175,7 @@ const toggleActive = () => {
             <!-- Side panel (1/3) — status + next billing -->
             <div class="space-y-4">
                 <div class="card-elevated p-5 md:p-6">
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Status</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Status</p>
                     <p class="text-lg font-semibold mt-2">
                         <span v-if="props.subscription.is_cancelled" class="text-slate-400">Cancelada</span>
                         <span v-else-if="!props.subscription.active" class="text-amber-600">Pausada</span>
@@ -195,7 +195,7 @@ const toggleActive = () => {
                 </div>
 
                 <div class="card-elevated p-5 md:p-6">
-                    <p class="text-xs uppercase tracking-wider text-slate-500 font-medium">Projeção</p>
+                    <p class="text-[11px] font-medium text-slate-500/90">Projeção</p>
                     <div class="mt-3 space-y-2">
                         <div class="flex justify-between">
                             <span class="text-sm text-slate-600 dark:text-slate-400">Mensal</span>
