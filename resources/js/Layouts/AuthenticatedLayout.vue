@@ -199,7 +199,7 @@ const totalResults = () => {
             <!-- Nav -->
             <nav class="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
                 <div v-for="group in nav" :key="group.section">
-                    <div class="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-400 dark:text-ink-500">
+                    <div class="px-3 mb-1.5 text-[11px] font-medium text-ink-400/70 dark:text-ink-500/80 select-none">
                         {{ group.section }}
                     </div>
                     <div class="space-y-0.5">
@@ -296,7 +296,7 @@ const totalResults = () => {
                 </div>
                 <nav class="flex-1 p-3 space-y-5 overflow-y-auto">
                     <div v-for="group in nav" :key="group.section">
-                        <div class="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-ink-400">{{ group.section }}</div>
+                        <div class="px-3 mb-1.5 text-[11px] font-medium text-ink-400/70 select-none">{{ group.section }}</div>
                         <Link v-for="item in group.items" :key="item.name" :href="route(item.route)" @click="sidebarOpen = false"
                               :class="['nav-item', isActive(item.route) ? 'nav-item-active' : '']">
                             <svg class="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -510,7 +510,16 @@ const totalResults = () => {
             </Transition>
 
             <main class="flex-1 px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-28 md:pb-8 max-w-7xl w-full mx-auto">
-                <slot />
+                <Transition
+                    enter-active-class="transition duration-300 ease-out"
+                    enter-from-class="opacity-0 translate-y-1"
+                    enter-to-class="opacity-100 translate-y-0"
+                    mode="out-in"
+                >
+                    <div :key="$page.url">
+                        <slot />
+                    </div>
+                </Transition>
             </main>
 
             <!-- Mobile bottom bar — liquid glass -->

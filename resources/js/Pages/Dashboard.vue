@@ -64,12 +64,17 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
 
         <!-- ─── HERO — Saldo total com gradiente + sparkline + glass refraction ─── -->
         <section class="surface-ink p-6 md:p-8 mb-6 sun-wrap">
-            <div class="absolute top-4 right-4 chip-ink text-white/60 border-white/10 z-10">
+            <div class="absolute top-4 right-4 flex items-center gap-1.5 z-10
+                        text-[11px] font-medium text-white/70
+                        px-2.5 py-1 rounded-full
+                        border border-white/10 bg-white/[0.04] backdrop-blur-sm
+                        transition-all duration-300 hover:bg-white/[0.08] hover:border-white/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 {{ homeCurrency }}
             </div>
 
             <div class="relative z-10 max-w-2xl">
-                <p class="text-xs uppercase tracking-[0.2em] text-white/60 font-semibold">Saldo total</p>
+                <p class="text-[11px] font-medium text-white/60 select-none">Saldo total</p>
                 <h1 class="font-display text-display-lg md:text-display-xl font-bold mt-2 num leading-none">
                     {{ formatCents(totalBalanceCents) }}
                 </h1>
@@ -82,9 +87,9 @@ const sparkOutflow = computed(() => sparkPath(props.monthlyFlow.map((m) => Math.
 
                 <!-- In-hero cashflow sparkline with glow on hover -->
                 <div class="mt-6 pt-5 border-t border-white/10">
-                    <div class="flex items-center gap-2 text-[11px] uppercase tracking-[0.15em] text-white/50 mb-2">
+                    <div class="flex items-center gap-2 text-[11px] font-medium text-white/55 mb-2 select-none">
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-sun-pulse"></span>
-                        <span>Fluxo · últimos 6 meses</span>
+                        <span>Fluxo dos últimos 6 meses</span>
                     </div>
                     <div class="sparkline-wrap" style="color: #FFC93C;">
                         <svg viewBox="0 0 100 30" preserveAspectRatio="none" class="w-full h-8 sparkline-glow">
