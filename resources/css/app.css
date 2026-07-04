@@ -697,3 +697,5 @@ html[data-motion-parallax="0"] .sun-parallax,
 html[data-motion-parallax="0"] [data-parallax] {
     transform: none !important;
 }
+
+/* rebuild-trigger 2026-07-04T03:12Z bust Docker cache */
