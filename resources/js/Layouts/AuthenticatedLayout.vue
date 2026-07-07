@@ -509,7 +509,7 @@ const totalResults = () => {
                 </div>
             </Transition>
 
-            <main class="flex-1 px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-36 md:pb-20 max-w-7xl w-full mx-auto">
+            <main class="flex-1 px-4 md:px-6 lg:px-8 py-6 md:py-8 pb-40 md:pb-24 max-w-7xl w-full mx-auto">
                 <Transition
                     enter-active-class="transition duration-300 ease-out"
                     enter-from-class="opacity-0 translate-y-1"
