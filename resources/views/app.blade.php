@@ -57,14 +57,14 @@
          Trick: -z-10 only works on positioned children. Body is `relative` so mesh sits behind bg.
          We give mesh a high z-index with isolation context so it's visible above body bg. -->
     <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden mesh-canvas" aria-hidden="true">
-        <div class="absolute -top-1/4 -right-1/4 w-[60vw] h-[60vw] max-w-[900px] max-h-[900px] rounded-full opacity-70 dark:opacity-60 blur-3xl animate-mesh-drift-a"
-             style="background: radial-gradient(circle, rgba(255, 138, 61, 0.75), transparent 60%);"></div>
-        <div class="absolute top-1/3 -left-1/4 w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] rounded-full opacity-60 dark:opacity-50 blur-3xl animate-mesh-drift-b"
-             style="background: radial-gradient(circle, rgba(124, 58, 237, 0.7), transparent 60%);"></div>
-        <div class="absolute -bottom-1/4 right-1/3 w-[40vw] h-[40vw] max-w-[700px] max-h-[700px] rounded-full opacity-50 dark:opacity-40 blur-3xl animate-mesh-drift-a"
-             style="animation-delay: -14s; background: radial-gradient(circle, rgba(255, 201, 60, 0.75), transparent 60%);"></div>
-        <div class="absolute top-2/3 left-1/4 w-[35vw] h-[35vw] max-w-[600px] max-h-[600px] rounded-full opacity-45 dark:opacity-35 blur-3xl animate-mesh-drift-b"
-             style="animation-delay: -7s; background: radial-gradient(circle, rgba(139, 92, 246, 0.65), transparent 60%);"></div>
+        <div class="absolute -top-1/4 -right-1/4 w-[60vw] h-[60vw] max-w-[900px] max-h-[900px] rounded-full opacity-45 dark:opacity-35 blur-3xl animate-mesh-drift-a"
+             style="background: radial-gradient(circle, rgba(255, 138, 61, 0.50), transparent 60%);"></div>
+        <div class="absolute top-1/3 -left-1/4 w-[50vw] h-[50vw] max-w-[800px] max-h-[800px] rounded-full opacity-40 dark:opacity-30 blur-3xl animate-mesh-drift-b"
+             style="background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 60%);"></div>
+        <div class="absolute -bottom-1/4 right-1/3 w-[40vw] h-[40vw] max-w-[700px] max-h-[700px] rounded-full opacity-35 dark:opacity-25 blur-3xl animate-mesh-drift-a"
+             style="animation-delay: -14s; background: radial-gradient(circle, rgba(255, 201, 60, 0.50), transparent 60%);"></div>
+        <div class="absolute top-2/3 left-1/4 w-[35vw] h-[35vw] max-w-[600px] max-h-[600px] rounded-full opacity-30 dark:opacity-22 blur-3xl animate-mesh-drift-b"
+             style="animation-delay: -7s; background: radial-gradient(circle, rgba(139, 92, 246, 0.40), transparent 60%);"></div>
     </div>
     <div class="relative z-10 min-h-full">
     @inertia

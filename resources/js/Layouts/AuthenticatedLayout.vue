@@ -157,15 +157,18 @@ const totalResults = () => {
 </script>
 
 <template>
-    <div class="min-h-screen bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-body mesh-canvas">
-        <!-- Decorative ambient mesh — sits behind everything, drifts slowly -->
-        <div class="fixed inset-0 -z-10 pointer-events-none">
-            <div class="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full opacity-40 blur-3xl animate-mesh-drift-a"
-                 style="background: radial-gradient(circle, rgba(255, 138, 61, 0.55), transparent 70%);"></div>
-            <div class="absolute top-1/3 -left-40 w-[600px] h-[600px] rounded-full opacity-30 blur-3xl animate-mesh-drift-b"
-                 style="background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 70%);"></div>
-            <div class="absolute bottom-0 right-1/3 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl animate-mesh-drift-a"
-                 style="animation-delay: -12s; background: radial-gradient(circle, rgba(255, 201, 60, 0.5), transparent 70%);"></div>
+    <div class="min-h-screen bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-body mesh-canvas overflow-x-clip">
+        <!-- Decorative ambient mesh — sits behind everything, drifts slowly.
+             opacity tuned so it never obscures content; overflow-hidden
+             keeps the negative-positioned blobs from causing horizontal
+             scroll jank when the user drags the trackpad left/right. -->
+        <div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+            <div class="absolute -top-40 -right-40 w-[700px] h-[700px] rounded-full opacity-25 dark:opacity-20 blur-3xl animate-mesh-drift-a"
+                 style="background: radial-gradient(circle, rgba(255, 138, 61, 0.40), transparent 70%);"></div>
+            <div class="absolute top-1/3 -left-40 w-[600px] h-[600px] rounded-full opacity-20 dark:opacity-15 blur-3xl animate-mesh-drift-b"
+                 style="background: radial-gradient(circle, rgba(124, 58, 237, 0.30), transparent 70%);"></div>
+            <div class="absolute bottom-0 right-1/3 w-[500px] h-[500px] rounded-full opacity-15 dark:opacity-12 blur-3xl animate-mesh-drift-a"
+                 style="animation-delay: -12s; background: radial-gradient(circle, rgba(255, 201, 60, 0.35), transparent 70%);"></div>
         </div>
 
         <!-- ─── Desktop sidebar (visible md+) ─── -->

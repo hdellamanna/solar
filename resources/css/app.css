@@ -17,6 +17,9 @@
     body {
         @apply bg-ink-50 text-ink-900 dark:bg-ink-950 dark:text-ink-50;
         font-feature-settings: "cv11", "ss01", "ss03";
+        /* Kill horizontal scroll jank from negative-positioned mesh
+           blobs that overshoot the viewport on either side. */
+        overflow-x: clip;
     }
     .num, .tabular-nums {
         font-variant-numeric: tabular-nums;
@@ -195,26 +198,26 @@
 }
 .mesh-canvas::before {
     background:
-        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 138, 61, 0.20) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 50% at 80% 10%, rgba(124, 58, 237, 0.18) 0%, transparent 50%),
-        radial-gradient(ellipse 70% 60% at 0% 100%, rgba(245, 158, 11, 0.12) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(139, 92, 246, 0.14) 0%, transparent 50%);
+        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 138, 61, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 80% 10%, rgba(124, 58, 237, 0.09) 0%, transparent 50%),
+        radial-gradient(ellipse 70% 60% at 0% 100%, rgba(245, 158, 11, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(139, 92, 246, 0.07) 0%, transparent 50%);
     filter: blur(0px);
     animation: mesh-drift-a 24s ease-in-out infinite;
 }
 .mesh-canvas::after {
     background:
-        radial-gradient(circle at 50% 50%, rgba(255, 201, 60, 0.10) 0%, transparent 40%),
-        radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.08) 0%, transparent 40%);
+        radial-gradient(circle at 50% 50%, rgba(255, 201, 60, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 0% 0%, rgba(124, 58, 237, 0.04) 0%, transparent 40%);
     mix-blend-mode: screen;
     animation: mesh-drift-b 32s ease-in-out infinite;
 }
 .dark .mesh-canvas::before {
     background:
-        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 138, 61, 0.12) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 50% at 80% 10%, rgba(139, 92, 246, 0.18) 0%, transparent 50%),
-        radial-gradient(ellipse 70% 60% at 0% 100%, rgba(245, 158, 11, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(139, 92, 246, 0.10) 0%, transparent 50%);
+        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 138, 61, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 80% 10%, rgba(139, 92, 246, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse 70% 60% at 0% 100%, rgba(245, 158, 11, 0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 50% at 100% 100%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
 }
 .dark .mesh-canvas::after {
     mix-blend-mode: plus-lighter;
