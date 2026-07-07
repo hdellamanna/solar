@@ -13,6 +13,10 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
+        /* Kill horizontal scroll jank from negative-positioned mesh
+           blobs (clipped but the browser still computes a virtual
+           scroll area if any descendant overflows horizontally). */
+        overflow-x: clip;
     }
     body {
         @apply bg-ink-50 text-ink-900 dark:bg-ink-950 dark:text-ink-50;
