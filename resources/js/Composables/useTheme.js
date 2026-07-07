@@ -1,6 +1,6 @@
 import { ref, watch, onMounted } from 'vue';
 
-const isDark = ref(false);
+const isDark = ref(true); // Default to dark — Solar's brand reads better in dark
 const STORAGE_KEY = 'solar-theme';
 
 export function useTheme() {
@@ -12,13 +12,19 @@ export function useTheme() {
 
     const init = (userTheme) => {
         if (typeof window === 'undefined') return;
+        // 1. User's stored preference always wins (they explicitly chose)
         const stored = localStorage.getItem(STORAGE_KEY);
-        let effective = userTheme;
-        if (stored) effective = stored;
-        if (!effective || effective === 'system') {
-            effective = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        let effective = stored;
+        // 2. Otherwise the dark default we picked for the brand
+        if (!effective) {
+            effective = 'dark';
         }
         apply(effective === 'dark');
+        // Persist 'dark' as the resolved choice so future reloads stay dark
+        // even if localStorage was empty (first-visit default).
+        if (!stored) {
+            try { localStorage.setItem(STORAGE_KEY, 'dark'); } catch (e) { /* noop */ }
+        }
     };
 
     const toggle = () => {

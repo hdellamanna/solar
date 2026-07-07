@@ -19,7 +19,7 @@
         $motionParallax = '1';
     }
 @endphp
-<html lang="pt-BR" class="h-full"
+<html lang="pt-BR" class="h-full dark"
       data-motion="{{ $motionPref }}"
       data-motion-backdrop="{{ $motionBackdrop }}"
       data-motion-spring="{{ $motionSpring }}"

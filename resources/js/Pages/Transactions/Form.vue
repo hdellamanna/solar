@@ -1,11 +1,13 @@
 <script setup>
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import SplitEditor from '@/Components/SplitEditor.vue';
 import { useAiCategorize } from '@/Composables/useAiCategorize';
 import { useFormatType } from '@/Composables/useFormatType';
 import { localizedNameOf } from '@/Composables/useLocalizedName';
 import { ref, computed, watch } from 'vue';
+
+const page = usePage();
 
 const props = defineProps({
     transaction: { type: Object, default: null },
@@ -106,7 +108,7 @@ const submit = () => {
 };
 
 const showAiSuggest = computed(() => {
-    const user = $page.props?.auth?.user;
+    const user = page.props?.auth?.user;
     return Boolean(user?.use_ai_categorize) && (form.description || '').trim().length >= 3;
 });
 
@@ -206,7 +208,7 @@ function scheduleToastClear() {
                     <div class="flex items-center gap-2">
                         <select v-model="form.category_id" class="input flex-1">
                             <option value="">Sem categoria</option>
-                            <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ localizedNameOf(c, $page.props.app?.locale || 'pt-BR') }}</option>
+                            <option v-for="c in filteredCategories" :key="c.id" :value="c.id">{{ c.icon }} {{ localizedNameOf(c, page.props.app?.locale || 'pt-BR') }}</option>
                         </select>
                         <button
                             v-if="showAiSuggest"
@@ -284,7 +286,7 @@ function scheduleToastClear() {
                     :total-cents="totalCents"
                     :users="props.users"
                     :categories="filteredCategories"
-                    :current-user-id="$page.props.auth.user.id"
+                    :current-user-id="page.props.auth.user.id"
                     @update:model-value="onSplitsUpdate"
                     @error="onSplitsError"
                 />
