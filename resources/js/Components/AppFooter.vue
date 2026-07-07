@@ -3,10 +3,11 @@
  * AppFooter — the copyright + nav footer that renders on every layout.
  * Reads build version + locale from Inertia shared props (appMeta).
  *
- * The footer slides up on first scroll (one-shot per session) when
- * `motion.spring` is enabled. When reduced, it's static from the first paint.
+ * Always visible — copyright/legal info should not be hidden behind
+ * a scroll trigger. Subtle fade-in only on first paint when motion
+ * is enabled, otherwise static from the start.
  */
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useMotionPreference } from '@/Composables/useMotionPreference';
 import { usePage } from '@inertiajs/vue3';
 
@@ -17,46 +18,19 @@ const buildVersion = computed(() => page.props.appMeta?.build_version ?? '0.11.0
 const locale = computed(() => page.props.appMeta?.locale ?? 'pt-BR');
 const year = new Date().getFullYear();
 
-// One-shot slide-up on first scroll
-const visible = ref(false);
-const sessionKey = 'solar:footer-shown';
-
-function onScroll() {
-    if (visible.value) return;
-    if (typeof window === 'undefined') return;
-    if (window.scrollY > 80) {
-        visible.value = true;
-        try { window.sessionStorage.setItem(sessionKey, '1'); } catch (e) { /* noop */ }
-        window.removeEventListener('scroll', onScroll);
-    }
-}
-
+// One-shot fade-in on mount (only if spring motion enabled).
+// No scroll-trigger — copyright is always visible.
+const mounted = ref(false);
 onMounted(() => {
-    if (typeof window === 'undefined') return;
-    try {
-        if (window.sessionStorage.getItem(sessionKey) === '1') {
-            visible.value = true;
-            return;
-        }
-    } catch (e) { /* noop */ }
-    if (spring.value) {
-        window.addEventListener('scroll', onScroll, { passive: true });
-    } else {
-        visible.value = true;
-    }
-});
-
-onUnmounted(() => {
-    if (typeof window !== 'undefined') {
-        window.removeEventListener('scroll', onScroll);
-    }
+    // Defer to next frame so the transition runs on first paint.
+    requestAnimationFrame(() => { mounted.value = true; });
 });
 </script>
 
 <template>
     <footer
         class="app-footer"
-        :class="{ 'app-footer--animated': spring && visible, 'app-footer--static': !spring || visible }"
+        :class="{ 'app-footer--ready': mounted }"
         role="contentinfo"
     >
         <div class="app-footer__inner">
@@ -79,20 +53,21 @@ onUnmounted(() => {
 <style scoped>
 .app-footer {
     width: 100%;
-    margin-top: 2.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     background: rgba(11, 15, 26, 0.55);
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.8125rem;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 200ms ease-out, transform 200ms ease-out;
+    /* Always visible — no scroll-trigger */
+    opacity: 1;
     z-index: 30;
+    /* Subtle fade-in if motion is enabled */
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 250ms ease-out, transform 250ms ease-out;
 }
-.app-footer--animated,
-.app-footer--static {
+.app-footer--ready {
     opacity: 1;
     transform: translateY(0);
 }
@@ -131,9 +106,10 @@ onUnmounted(() => {
     margin-right: 0.5rem;
     color: rgba(255, 255, 255, 0.3);
 }
+/* Reduced motion: no animation */
 html[data-motion="reduced"] .app-footer {
-    transition: none !important;
     opacity: 1 !important;
     transform: none !important;
+    transition: none !important;
 }
 </style>
