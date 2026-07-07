@@ -52,15 +52,19 @@ onMounted(() => {
 
 <style scoped>
 .app-footer {
+    /* Sticky to the bottom of the viewport — copyright/legal info
+       is always one click away, regardless of scroll position. */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     width: 100%;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    background: rgba(11, 15, 26, 0.55);
+    background: rgba(11, 15, 26, 0.72);
     color: rgba(255, 255, 255, 0.72);
     font-size: 0.8125rem;
-    /* Always visible — no scroll-trigger */
-    opacity: 1;
     z-index: 30;
     /* Subtle fade-in if motion is enabled */
     opacity: 0;
@@ -71,10 +75,24 @@ onMounted(() => {
     opacity: 1;
     transform: translateY(0);
 }
+/* On mobile the authenticated layout's bottom nav (h-16) sits at
+   bottom-0; push the footer above it so they don't collide. */
+@media (max-width: 767px) {
+    .app-footer {
+        bottom: 4rem; /* h-16 = 4rem */
+    }
+}
+/* On md+ the authenticated layout's sidebar (w-64 = 16rem) sits at
+   left:0 fixed; push the footer right of it. */
+@media (min-width: 768px) {
+    .app-footer {
+        left: 16rem;
+    }
+}
 .app-footer__inner {
     max-width: 80rem;
     margin: 0 auto;
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 1.25rem;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -106,6 +124,7 @@ onMounted(() => {
     margin-right: 0.5rem;
     color: rgba(255, 255, 255, 0.3);
 }
+
 /* Reduced motion: no animation */
 html[data-motion="reduced"] .app-footer {
     opacity: 1 !important;

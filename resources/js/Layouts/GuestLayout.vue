@@ -13,8 +13,10 @@ const { t } = useT();
 
 <template>
     <div class="min-h-screen flex flex-col bg-ink-50 dark:bg-ink-950">
-        <!-- Row: visual brand panel + form area (fill remaining height) -->
-        <div class="flex-1 flex">
+        <!-- Row: visual brand panel + form area (fill remaining height)
+             pb-16 reserves space for the fixed AppFooter so the form
+             isn't covered by it. -->
+        <div class="flex-1 flex pb-16">
             <!-- LEFT: visual brand panel (hidden on mobile) -->
             <aside class="hidden lg:flex flex-col w-[44%] xl:w-[48%] relative overflow-hidden bg-ink-950 text-white mesh-canvas">
                 <!-- Layered gradient mesh background -->
