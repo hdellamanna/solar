@@ -58,7 +58,6 @@ onMounted(() => {
     bottom: 0;
     left: 0;
     right: 0;
-    width: 100%;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
