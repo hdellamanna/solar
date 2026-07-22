@@ -26,7 +26,7 @@ class SetupValidatorTest extends TestCase
     {
         parent::setUp();
         $this->withoutAutoSetupComplete();
-        $this->validator = new SetupValidator();
+        $this->validator = new SetupValidator;
     }
 
     public function test_required_are_set_returns_false_when_app_key_missing(): void
@@ -35,26 +35,42 @@ class SetupValidatorTest extends TestCase
         // the realistic case for a misconfigured deploy where
         // `php artisan key:generate` was never run.
         //
-        // Laravel's env() is backed by a Repository singleton that caches
-        // values on first read — which happens during test bootstrap. The
-        // Repository's ::clear() doesn't help because phpunit.xml's
-        // <env name="APP_KEY"> is re-applied on every test.
-        //
-        // The fix is to test the validator's other required var (MAIL_FROM_ADDRESS)
-        // which is reliably empty in the phpunit.xml environment:
-        config(['mail.from.address' => null]);
+        // SetupValidator::resolve() reads config() first and never falls
+        // back to env() when the key is mapped — so zeroing out config()
+        // is sufficient to simulate "missing".
+        $configKeys = [
+            'app.key',
+            'app.url',
+            'database.default',
+            'mail.default',
+            'mail.from.address',
+        ];
 
-        $this->assertFalse($this->validator->requiredAreSet());
+        $originals = [];
+        foreach ($configKeys as $key) {
+            $originals[$key] = config($key);
+            config([$key => null]);
+        }
+
+        try {
+            $this->assertFalse($this->validator->requiredAreSet());
+        } finally {
+            foreach ($originals as $key => $value) {
+                if ($value !== null) {
+                    config([$key => $value]);
+                }
+            }
+        }
     }
 
     public function test_required_are_set_returns_true_when_everything_set(): void
     {
         config([
-            'app.key'             => 'base64:'.str_repeat('a', 44),
-            'app.url'             => 'https://solar.example',
-            'database.default'    => 'sqlite',
-            'mail.default'        => 'log',
-            'mail.from.address'   => 'demo@solar.app',
+            'app.key' => 'base64:'.str_repeat('a', 44),
+            'app.url' => 'https://solar.example',
+            'database.default' => 'sqlite',
+            'mail.default' => 'log',
+            'mail.from.address' => 'demo@solar.app',
         ]);
 
         $this->assertTrue($this->validator->requiredAreSet());
@@ -71,7 +87,7 @@ class SetupValidatorTest extends TestCase
         $this->assertDatabaseMissing('app_meta', ['key' => 'setup_completed_at']);
 
         AppMeta::create([
-            'key'   => 'setup_completed_at',
+            'key' => 'setup_completed_at',
             'value' => now()->toIso8601String(),
         ]);
 
@@ -105,15 +121,17 @@ class SetupValidatorTest extends TestCase
 
     public function test_collect_masks_secrets(): void
     {
+        // SetupValidator::resolve() reads RESEND_API_KEY via config('services.resend.key').
+        // Setting config() alone is enough — the validator doesn't fall back to env()
+        // for mapped keys.
         config([
-            'app.key'           => 'base64:'.str_repeat('a', 44),
-            'app.url'           => 'https://solar.example',
-            'database.default'  => 'sqlite',
-            'mail.default'      => 'log',
+            'app.key' => 'base64:'.str_repeat('a', 44),
+            'app.url' => 'https://solar.example',
+            'database.default' => 'sqlite',
+            'mail.default' => 'log',
             'mail.from.address' => 'demo@solar.app',
+            'services.resend.key' => 're_supersecretkey123456789',
         ]);
-
-        putenv('RESEND_API_KEY=re_supersecretkey123456789');
 
         $vars = $this->validator->collect();
         $resend = collect($vars)->firstWhere('key', 'RESEND_API_KEY');
@@ -124,7 +142,5 @@ class SetupValidatorTest extends TestCase
         // Mask should keep the first 4 chars and bullet the rest
         $this->assertStringStartsWith('re_s', $resend['current_value']);
         $this->assertStringNotContainsString('supersecretkey', $resend['current_value']);
-
-        putenv('RESEND_API_KEY=');
     }
 }
